@@ -1,13 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { SecurityConfig, ServerConfig, ShellConfig } from '../types/config';
+import { ServerConfig, ShellConfig } from '../types/config.js';
 
 const defaultValidatePathRegex = /^[a-zA-Z]:\\(?:[^<>:"/\\|?*]+\\)*[^<>:"/\\|?*]*$/;
 
 export const DEFAULT_CONFIG: ServerConfig = {
   security: {
-    maxCommandLength: 1000,
+    maxCommandLength: 2000,
     blockedCommands: [
       'rm', 'del', 'rmdir', 'format',
       'shutdown', 'restart',
@@ -38,7 +38,7 @@ export const DEFAULT_CONFIG: ServerConfig = {
     },
     gitbash: {
       enabled: true,
-      command: 'E:\\Programme\\Git\\bin\\bash.exe',
+      command: 'C:\\Program Files\\Git\\bin\\bash.exe',
       args: ['-c'],
       validatePath: (dir: string) => dir.match(defaultValidatePathRegex) !== null
     }
@@ -106,11 +106,11 @@ function mergeConfigs(defaultConfig: ServerConfig, userConfig: Partial<ServerCon
   };
 
   // Ensure validatePath functions are preserved if not overridden
-  Object.entries(merged.shells).forEach(([key, shell]) => {
+  for (const [key, shell] of Object.entries(merged.shells) as [keyof typeof merged.shells, ShellConfig][]) {
     if (!shell.validatePath) {
-      shell.validatePath = defaultConfig.shells[key as keyof typeof defaultConfig.shells].validatePath;
+      shell.validatePath = defaultConfig.shells[key].validatePath;
     }
-  });
+  }
 
   return merged;
 }

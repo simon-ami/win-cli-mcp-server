@@ -1,14 +1,35 @@
 {
-  "name": "@modelcontextprotocol/server-windows-cli",
-  "version": "0.1.0",
+  "name": "@simonb97/server-win-cli",
+  "version": "0.1.1",
   "description": "MCP server for Windows CLI interactions",
   "type": "module",
   "bin": {
-    "mcp-server-windows-cli": "dist/index.js"
+    "server-win-cli": "./dist/index.js"
   },
   "files": [
     "dist"
   ],
+  "license": "MIT",
+  "author": "Simon Benedict",
+  "homepage": "https://github.com/SimonB97/win-cli-mcp-server",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SimonB97/win-cli-mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SimonB97/win-cli-mcp-server/issues"
+  },
+  "keywords": [
+    "mcp",
+    "claude",
+    "cli",
+    "windows",
+    "modelcontextprotocol",
+    "mcp-server"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "build": "tsc && shx chmod +x dist/index.js",
     "prepare": "npm run build",
@@ -22,7 +43,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
-    "@types/yargs": "^17.0.32",
+    "@types/yargs": "^17.0.33",
     "shx": "^0.3.4",
     "typescript": "^5.3.3"
   }

@@ -10,47 +10,37 @@ import {
 import { spawn } from 'child_process';
 import { z } from 'zod';
 import path from 'path';
-import os from 'os';
-import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
 import { loadConfig, createDefaultConfig } from './utils/config.js';
+import type { ServerConfig } from './types/config.js';
 
-// Parse command line arguments
-const argv = yargs(hideBin(process.argv))
-  .option('config', {
-    alias: 'c',
-    type: 'string',
-    description: 'Path to config file'
-  })
-  .option('init-config', {
-    type: 'string',
-    description: 'Create a default config file at the specified path'
-  })
-  .help()
-  .argv;
+// Parse command line arguments using yargs
+import yargs from 'yargs/yargs';
+import { hideBin } from 'yargs/helpers';
 
-// Handle --init-config flag
-if (argv['init-config']) {
-  try {
-    createDefaultConfig(argv['init-config'] as string);
-    console.error(`Created default config at: ${argv['init-config']}`);
-    process.exit(0);
-  } catch (error) {
-    console.error('Failed to create config file:', error);
-    process.exit(1);
-  }
-}
-
-// Load configuration
-const config = loadConfig(argv.config as string | undefined);
+const parseArgs = async () => {
+  return yargs(hideBin(process.argv))
+    .option('config', {
+      alias: 'c',
+      type: 'string',
+      description: 'Path to config file'
+    })
+    .option('init-config', {
+      type: 'string',
+      description: 'Create a default config file at the specified path'
+    })
+    .help()
+    .parse();
+};
 
 class CLIServer {
   private server: Server;
   private allowedPaths: Set<string>;
   private blockedCommands: Set<string>;
   private commandHistory: Array<{ command: string; output: string; timestamp: string }>;
+  private config: ServerConfig;
 
-  constructor() {
+  constructor(config: ServerConfig) {
+    this.config = config;
     this.server = new Server({
       name: "windows-cli-server",
       version: "0.1.0",
@@ -80,10 +70,10 @@ class CLIServer {
     }
 
     // Validate command length
-    if (command.length > config.security.maxCommandLength) {
+    if (command.length > this.config.security.maxCommandLength) {
       throw new McpError(
         ErrorCode.InvalidRequest,
-        `Command exceeds maximum length of ${config.security.maxCommandLength}`
+        `Command exceeds maximum length of ${this.config.security.maxCommandLength}`
       );
     }
   }
@@ -100,7 +90,9 @@ class CLIServer {
             properties: {
               shell: {
                 type: "string",
-                enum: Object.keys(config.shells).filter(shell => config.shells[shell as keyof typeof config.shells].enabled),
+                enum: Object.keys(this.config.shells).filter(shell => 
+                  this.config.shells[shell as keyof typeof this.config.shells].enabled
+                ),
                 description: "Shell to use for command execution"
               },
               command: {
@@ -123,7 +115,7 @@ class CLIServer {
             properties: {
               limit: {
                 type: "number",
-                description: `Maximum number of history entries to return (default: 10, max: ${config.security.maxHistorySize})`
+                description: `Maximum number of history entries to return (default: 10, max: ${this.config.security.maxHistorySize})`
               }
             }
           }
@@ -137,8 +129,8 @@ class CLIServer {
         switch (request.params.name) {
           case "execute_command": {
             const args = z.object({
-              shell: z.enum(Object.keys(config.shells).filter(shell => 
-                config.shells[shell as keyof typeof config.shells].enabled
+              shell: z.enum(Object.keys(this.config.shells).filter(shell => 
+                this.config.shells[shell as keyof typeof this.config.shells].enabled
               ) as [string, ...string[]]),
               command: z.string(),
               workingDir: z.string().optional()
@@ -152,9 +144,10 @@ class CLIServer {
               path.resolve(args.workingDir) : 
               process.cwd();
 
-            const shellConfig = config.shells[args.shell];
+            const shellKey = args.shell as keyof typeof this.config.shells;
+            const shellConfig = this.config.shells[shellKey];
             
-            if (config.security.restrictWorkingDirectory) {
+            if (this.config.security.restrictWorkingDirectory) {
               const isAllowedPath = Array.from(this.allowedPaths).some(
                 allowedPath => workingDir.startsWith(allowedPath)
               );
@@ -190,7 +183,7 @@ class CLIServer {
                 const result = output || error;
                 
                 // Store in history
-                if (config.security.logCommands) {
+                if (this.config.security.logCommands) {
                   this.commandHistory.push({
                     command: args.command,
                     output: result,
@@ -198,27 +191,18 @@ class CLIServer {
                   });
 
                   // Trim history if needed
-                  if (this.commandHistory.length > config.security.maxHistorySize) {
-                    this.commandHistory = this.commandHistory.slice(-config.security.maxHistorySize);
+                  if (this.commandHistory.length > this.config.security.maxHistorySize) {
+                    this.commandHistory = this.commandHistory.slice(-this.config.security.maxHistorySize);
                   }
                 }
 
-                if (code === 0) {
-                  resolve({
-                    content: [{
-                      type: "text",
-                      text: result
-                    }]
-                  });
-                } else {
-                  resolve({
-                    content: [{
-                      type: "text",
-                      text: `Command failed with code ${code}:\n${result}`
-                    }],
-                    isError: true
-                  });
-                }
+                resolve({
+                  content: [{
+                    type: "text",
+                    text: code === 0 ? result : `Command failed with code ${code}:\n${result}`
+                  }],
+                  isError: code !== 0
+                });
               });
 
               shellProcess.on('error', (err) => {
@@ -231,7 +215,7 @@ class CLIServer {
           }
 
           case "get_command_history": {
-            if (!config.security.logCommands) {
+            if (!this.config.security.logCommands) {
               return {
                 content: [{
                   type: "text",
@@ -243,7 +227,7 @@ class CLIServer {
             const args = z.object({
               limit: z.number()
                 .min(1)
-                .max(config.security.maxHistorySize)
+                .max(this.config.security.maxHistorySize)
                 .optional()
                 .default(10)
             }).parse(request.params.arguments);
@@ -285,15 +269,35 @@ class CLIServer {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
     console.error("Windows CLI MCP Server running on stdio");
-    if (argv.config) {
-      console.error(`Using config file: ${argv.config}`);
-    }
   }
 }
 
 // Start server
-const server = new CLIServer();
-server.run().catch((error) => {
-  console.error("Fatal error:", error);
-  process.exit(1);
-});
+const main = async () => {
+  try {
+    const args = await parseArgs();
+    
+    // Handle --init-config flag
+    if (args['init-config']) {
+      try {
+        createDefaultConfig(args['init-config'] as string);
+        console.error(`Created default config at: ${args['init-config']}`);
+        process.exit(0);
+      } catch (error) {
+        console.error('Failed to create config file:', error);
+        process.exit(1);
+      }
+    }
+
+    // Load configuration
+    const config = loadConfig(args.config);
+    
+    const server = new CLIServer(config);
+    await server.run();
+  } catch (error) {
+    console.error("Fatal error:", error);
+    process.exit(1);
+  }
+};
+
+main();

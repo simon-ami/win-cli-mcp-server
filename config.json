@@ -2,11 +2,18 @@
   "security": {
     "maxCommandLength": 1000,
     "blockedCommands": [
-      "rm", "del", "rmdir", "format",
-      "shutdown", "restart",
-      "reg", "regedit",
-      "net", "netsh",
-      "takeown", "icacls"
+      "rm",
+      "del",
+      "rmdir",
+      "format",
+      "shutdown",
+      "restart",
+      "reg",
+      "regedit",
+      "net",
+      "netsh",
+      "takeown",
+      "icacls"
     ],
     "allowedPaths": [
       "C:\\Users\\sbene",

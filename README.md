@@ -1,21 +1,17 @@
 # Windows CLI MCP Server
 
-MCP server for secure command-line interactions on Windows systems, enabling controlled access to PowerShell, CMD, and Git Bash shells.
+MCP server for secure command-line interactions on Windows systems, enabling controlled access to PowerShell, CMD, and Git Bash shells. It enables MCP clients (like [Claude Desktop](https://claude.ai/download)) to perform operations on your system, similar to [Open Interpreter](https://github.com/OpenInterpreter/open-interpreter).
 
-> ⚠️ **WARNING**: This MCP server provides direct access to your system's command line interface. When enabled, it grants access to:
->
-> - Your personal files and directories
-> - System environment variables (which may contain sensitive information)
-> - Command execution capabilities that could modify your system
-> - Local development environments and tools
+> ⚠️ **WARNING**: This MCP server provides direct access to your system's command line interface. When enabled, it grants access to your files, environment variables, and command execution capabilities.
 >
 > Always:
 >
-> - Review and restrict the `allowedPaths` configuration
-> - Enable strict directory restrictions
-> - Configure appropriate command blocks
-> - Be aware of what system access you're granting
-> - Consider the security implications of your configuration choices
+> - Review and restrict allowed paths
+> - Enable directory restrictions
+> - Configure command blocks
+> - Consider security implications
+>
+> See [Configuration](#configuration) for more details.
 
 ## Features
 
@@ -33,43 +29,46 @@ MCP server for secure command-line interactions on Windows systems, enabling con
 
 **Note**: The server will only allow operations within configured directories and with allowed commands.
 
-## API
+## Usage with Claude Desktop
 
-### Resources
+Add this to your `claude_desktop_config.json`:
 
-None (this server provides tools only)
+```json
+{
+  "mcpServers": {
+    "windows-cli": {
+      "command": "npx",
+      "args": ["-y", "@simonb97/server-win-cli"]
+    }
+  }
+}
+```
 
-### Tools
+For use with a specific config file, add the `--config` flag:
 
-- **execute_command**
-
-  - Execute a command in the specified shell
-  - Inputs:
-    - `shell` (string): Shell to use ("powershell", "cmd", or "gitbash")
-    - `command` (string): Command to execute
-    - `workingDir` (optional string): Working directory
-
-- **get_command_history**
-  - Get the history of executed commands
-  - Input: `limit` (optional number)
-  - Returns timestamped command history with outputs
+```json
+"args": ["-y", "@simonb97/server-win-cli", "--config", "path/to/your/config.json"]
+```
 
 ## Configuration
 
 The server uses a JSON configuration file to customize its behavior. You can specify settings for security controls and shell configurations.
 
-### Basic Setup
-
-1. Create a default config:
+To create a default config file, run:
 
 ```bash
-node dist/index.js --init-config ./my-config.json
+npx @simonb97/server-win-cli --init-config ./config.json
 ```
 
-2. Default config locations (searched in order):
-   - Path specified by `--config` flag
-   - ./config.json in current directory
-   - ~/.win-cli-mcp/config.json in user's home directory
+### Configuration Locations
+
+The server looks for configuration in the following locations (in order):
+
+1. Path specified by `--config` flag
+2. ./config.json in current directory
+3. ~/.win-cli-mcp/config.json in user's home directory
+
+If no configuration file is found, the server will use a default (restricted) configuration.
 
 ### Configuration Settings
 
@@ -142,113 +141,46 @@ The configuration file is divided into two main sections: `security` and `shells
 }
 ```
 
-### Example Configurations
+## API
 
-1. Minimal Security Configuration:
+### Tools
 
-```json
-{
-  "security": {
-    "maxCommandLength": 2000,
-    "blockedCommands": ["rm", "format", "shutdown"],
-    "allowedPaths": ["C:\\Users\\YourUsername"],
-    "restrictWorkingDirectory": false,
-    "logCommands": true,
-    "maxHistorySize": 100
-  }
-}
-```
+- **execute_command**
 
-2. PowerShell-Only Configuration:
+  - Execute a command in the specified shell
+  - Inputs:
+    - `shell` (string): Shell to use ("powershell", "cmd", or "gitbash")
+    - `command` (string): Command to execute
+    - `workingDir` (optional string): Working directory
+  - Returns command output as text, or error message if execution fails
 
-```json
-{
-  "shells": {
-    "powershell": {
-      "enabled": true,
-      "command": "powershell.exe",
-      "args": ["-NoProfile", "-NonInteractive", "-Command"]
-    },
-    "cmd": {
-      "enabled": false
-    },
-    "gitbash": {
-      "enabled": false
-    }
-  }
-}
-```
-
-## Usage with Claude Desktop
-
-Add this to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "windows-cli": {
-      "command": "node",
-      // Config flag and path are optional
-      "args": ["path/to/dist/index.js", "--config", "path/to/your/config.json"]
-    }
-  }
-}
-```
+- **get_command_history**
+  - Get the history of executed commands
+  - Input: `limit` (optional number)
+  - Returns timestamped command history with outputs
 
 ## Security Considerations
 
 - Commands containing blocked terms are rejected
 - Working directories are validated against allowed paths
-- Command length is limited to prevent abuse
+- Command length is limited by default
 - Shell processes are properly terminated
-- Command history length is configurable
 - All inputs are validated before execution
 - Environment variables and personal files may be accessible within allowed paths
 - Consider limiting access to sensitive directories and environment information
-- Review and test security settings before deployment
 
-## Installation
+## Troubleshooting
 
-1. Ensure prerequisites:
-
-   - Node.js 18 or higher
-   - npm or yarn
-   - Windows with PowerShell and CMD
-   - Git Bash (optional, for Git Bash support)
-
-2. Install dependencies:
-
-```bash
-npm install
-```
-
-3. Build the server:
-
-```bash
-npm run build
-```
+- Ensure the config.json path is correct in your Claude Desktop configuration
+- Verify that the specified shells are available on your system
+- Check that the allowed paths exist and are accessible
+- Review the command history for any failed operations
+- Ensure proper permissions for accessing specified directories
 
 ## Development
 
-1. Clone the repository:
-
-```bash
-git clone <repository-url>
-cd win-cli-mcp-server
-```
-
-2. Install dependencies:
-
-```bash
-npm install
-```
-
-3. Build in watch mode:
-
-```bash
-npm run watch
-```
+For development instructions and contributing guidelines, please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-This MCP server is licensed under the MIT License. This means you are free to use, modify, and distribute the software, subject to the terms and conditions of the MIT License. For more details, please see the LICENSE file in the project repository.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
