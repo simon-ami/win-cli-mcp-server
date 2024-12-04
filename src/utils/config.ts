@@ -70,8 +70,10 @@ export function loadConfig(configPath?: string): ServerConfig {
     }
   }
 
-  // Deep merge with defaults
-  const mergedConfig = mergeConfigs(DEFAULT_CONFIG, loadedConfig);
+  // Use defaults only if no config was loaded
+  const mergedConfig = Object.keys(loadedConfig).length > 0 
+    ? mergeConfigs(DEFAULT_CONFIG, loadedConfig)
+    : DEFAULT_CONFIG;
 
   // Validate the merged config
   validateConfig(mergedConfig);
@@ -82,30 +84,18 @@ export function loadConfig(configPath?: string): ServerConfig {
 function mergeConfigs(defaultConfig: ServerConfig, userConfig: Partial<ServerConfig>): ServerConfig {
   const merged: ServerConfig = {
     security: {
-      ...defaultConfig.security,
-      ...(userConfig.security || {}),
-      // Merge arrays
-      blockedCommands: [
-        ...new Set([
-          ...(defaultConfig.security.blockedCommands || []),
-          ...(userConfig.security?.blockedCommands || [])
-        ])
-      ],
-      allowedPaths: [
-        ...new Set([
-          ...(defaultConfig.security.allowedPaths || []),
-          ...(userConfig.security?.allowedPaths || [])
-        ])
-      ]
+      // If user provided security config, use it entirely, otherwise use default
+      ...(userConfig.security || defaultConfig.security)
     },
     shells: {
-      powershell: { ...defaultConfig.shells.powershell, ...userConfig.shells?.powershell },
-      cmd: { ...defaultConfig.shells.cmd, ...userConfig.shells?.cmd },
-      gitbash: { ...defaultConfig.shells.gitbash, ...userConfig.shells?.gitbash }
+      // Same for each shell - if user provided config, use it entirely
+      powershell: userConfig.shells?.powershell || defaultConfig.shells.powershell,
+      cmd: userConfig.shells?.cmd || defaultConfig.shells.cmd,
+      gitbash: userConfig.shells?.gitbash || defaultConfig.shells.gitbash
     }
   };
 
-  // Ensure validatePath functions are preserved if not overridden
+  // Only add validatePath functions if they don't exist
   for (const [key, shell] of Object.entries(merged.shells) as [keyof typeof merged.shells, ShellConfig][]) {
     if (!shell.validatePath) {
       shell.validatePath = defaultConfig.shells[key].validatePath;
