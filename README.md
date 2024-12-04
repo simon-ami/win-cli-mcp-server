@@ -54,11 +54,13 @@ For use with a specific config file, add the `--config` flag:
 
 The server uses a JSON configuration file to customize its behavior. You can specify settings for security controls and shell configurations.
 
-To create a default config file, run:
+To create a default config file, copy `config.json.example` to `config.json`, or run:
 
 ```bash
-npx server-win-cli --init-config ./config.json
+npx @simonb97/server-win-cli --init-config ./config.json
 ```
+
+Then set the `--config` flag to point to your config file.
 
 ### Configuration Locations
 
@@ -69,6 +71,53 @@ The server looks for configuration in the following locations (in order):
 3. ~/.win-cli-mcp/config.json in user's home directory
 
 If no configuration file is found, the server will use a default (restricted) configuration.
+
+### Default Configuration
+
+If no configuration file is found, the server uses the following default settings:
+
+```json
+{
+  "security": {
+    "maxCommandLength": 2000,
+    "blockedCommands": [
+      "rm",
+      "del",
+      "rmdir",
+      "format",
+      "shutdown",
+      "restart",
+      "reg",
+      "regedit",
+      "net",
+      "netsh",
+      "takeown",
+      "icacls"
+    ],
+    "allowedPaths": ["User's home directory", "Current working directory"],
+    "restrictWorkingDirectory": true,
+    "logCommands": true,
+    "maxHistorySize": 1000
+  },
+  "shells": {
+    "powershell": {
+      "enabled": true,
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-NonInteractive", "-Command"]
+    },
+    "cmd": {
+      "enabled": true,
+      "command": "cmd.exe",
+      "args": ["/c"]
+    },
+    "gitbash": {
+      "enabled": true,
+      "command": "C:\\Program Files\\Git\\bin\\bash.exe",
+      "args": ["-c"]
+    }
+  }
+}
+```
 
 ### Configuration Settings
 
