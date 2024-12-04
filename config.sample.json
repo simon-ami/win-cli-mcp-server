@@ -1,0 +1,36 @@
+{
+  "security": {
+    "maxCommandLength": 2000,
+    "blockedCommands": [
+      "rm", "del", "rmdir", "format",
+      "shutdown", "restart",
+      "reg", "regedit",
+      "net", "netsh",
+      "takeown", "icacls"
+    ],
+    "allowedPaths": [
+      "C:\\Users\\YourUsername",
+      "C:\\Projects"
+    ],
+    "restrictWorkingDirectory": true,
+    "logCommands": true,
+    "maxHistorySize": 1000
+  },
+  "shells": {
+    "powershell": {
+      "enabled": true,
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-NonInteractive", "-Command"]
+    },
+    "cmd": {
+      "enabled": true,
+      "command": "cmd.exe",
+      "args": ["/c"]
+    },
+    "gitbash": {
+      "enabled": true,
+      "command": "E:\\Programme\\Git\\bin\\bash.exe",
+      "args": ["-c"]
+    }
+  }
+}
