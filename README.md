@@ -57,7 +57,7 @@ The server uses a JSON configuration file to customize its behavior. You can spe
 To create a default config file, run:
 
 ```bash
-npx @simonb97/server-win-cli --init-config ./config.json
+npx server-win-cli --init-config ./config.json
 ```
 
 ### Configuration Locations
@@ -176,10 +176,6 @@ The configuration file is divided into two main sections: `security` and `shells
 - Check that the allowed paths exist and are accessible
 - Review the command history for any failed operations
 - Ensure proper permissions for accessing specified directories
-
-## Development
-
-For development instructions and contributing guidelines, please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
