@@ -22,3 +22,10 @@ export interface ServerConfig {
     gitbash: ShellConfig;
   };
 }
+
+interface CommandHistoryEntry {
+  command: string;
+  output: string;
+  timestamp: string;
+  exitCode: number;
+}

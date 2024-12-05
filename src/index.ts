@@ -162,11 +162,21 @@ class CLIServer {
 
             // Execute command
             return new Promise((resolve, reject) => {
-              const shellProcess = spawn(
-                shellConfig.command,
-                [...shellConfig.args, args.command],
-                { cwd: workingDir }
-              );
+              let shellProcess: ReturnType<typeof spawn>;
+              
+              try {
+                shellProcess = spawn(
+                  shellConfig.command,
+                  [...shellConfig.args, args.command],
+                  { cwd: workingDir }
+                );
+              } catch (err) {
+                // Handle spawn errors (e.g., shell executable not found)
+                throw new McpError(
+                  ErrorCode.InternalError,
+                  `Failed to start shell process: ${err instanceof Error ? err.message : String(err)}`
+                );
+              }
 
               let output = '';
               let error = '';
@@ -180,14 +190,31 @@ class CLIServer {
               });
 
               shellProcess.on('close', (code) => {
-                const result = output || error;
+                // Prepare detailed result message
+                let resultMessage = '';
                 
-                // Store in history
+                if (code === 0) {
+                  resultMessage = output || 'Command completed successfully (no output)';
+                } else {
+                  resultMessage = `Command failed with exit code ${code}\n`;
+                  if (error) {
+                    resultMessage += `Error output:\n${error}\n`;
+                  }
+                  if (output) {
+                    resultMessage += `Standard output:\n${output}`;
+                  }
+                  if (!error && !output) {
+                    resultMessage += 'No error message or output was provided';
+                  }
+                }
+
+                // Store in history if enabled
                 if (this.config.security.logCommands) {
                   this.commandHistory.push({
                     command: args.command,
-                    output: result,
-                    timestamp: new Date().toISOString()
+                    output: resultMessage,
+                    timestamp: new Date().toISOString(),
+                    exitCode: code
                   });
 
                   // Trim history if needed
@@ -199,18 +226,53 @@ class CLIServer {
                 resolve({
                   content: [{
                     type: "text",
-                    text: code === 0 ? result : `Command failed with code ${code}:\n${result}`
+                    text: resultMessage
                   }],
-                  isError: code !== 0
+                  isError: code !== 0,
+                  metadata: {
+                    exitCode: code,
+                    shell: args.shell,
+                    workingDirectory: workingDir
+                  }
                 });
               });
 
+              // Handle process errors (e.g., shell crashes)
               shellProcess.on('error', (err) => {
+                const errorMessage = `Shell process error: ${err.message}`;
+                if (this.config.security.logCommands) {
+                  this.commandHistory.push({
+                    command: args.command,
+                    output: errorMessage,
+                    timestamp: new Date().toISOString(),
+                    exitCode: -1
+                  });
+                }
                 reject(new McpError(
                   ErrorCode.InternalError,
-                  `Failed to execute command: ${err.message}`
+                  errorMessage
                 ));
               });
+
+              // Set timeout to prevent hanging
+              const timeout = setTimeout(() => {
+                shellProcess.kill();
+                const timeoutMessage = 'Command execution timed out after 30 seconds';
+                if (this.config.security.logCommands) {
+                  this.commandHistory.push({
+                    command: args.command,
+                    output: timeoutMessage,
+                    timestamp: new Date().toISOString(),
+                    exitCode: -1
+                  });
+                }
+                reject(new McpError(
+                  ErrorCode.InternalError,
+                  timeoutMessage
+                ));
+              }, 30000); // 30 second timeout
+
+              shellProcess.on('close', () => clearTimeout(timeout));
             });
           }
 
