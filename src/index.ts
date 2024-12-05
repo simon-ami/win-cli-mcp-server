@@ -11,7 +11,7 @@ import { spawn } from 'child_process';
 import { z } from 'zod';
 import path from 'path';
 import { loadConfig, createDefaultConfig } from './utils/config.js';
-import type { ServerConfig } from './types/config.js';
+import type { ServerConfig, CommandHistoryEntry } from './types/config.js';
 
 // Parse command line arguments using yargs
 import yargs from 'yargs/yargs';
@@ -36,7 +36,7 @@ class CLIServer {
   private server: Server;
   private allowedPaths: Set<string>;
   private blockedCommands: Set<string>;
-  private commandHistory: Array<{ command: string; output: string; timestamp: string }>;
+  private commandHistory: CommandHistoryEntry[];
   private config: ServerConfig;
 
   constructor(config: ServerConfig) {
@@ -278,7 +278,7 @@ class CLIServer {
                     command: args.command,
                     output: resultMessage,
                     timestamp: new Date().toISOString(),
-                    exitCode: code
+                    exitCode: code ?? -1
                   });
 
                   // Trim history if needed
@@ -294,7 +294,7 @@ class CLIServer {
                   }],
                   isError: code !== 0,
                   metadata: {
-                    exitCode: code,
+                    exitCode: code ?? -1,
                     shell: args.shell,
                     workingDirectory: workingDir
                   }

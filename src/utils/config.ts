@@ -15,6 +15,10 @@ export const DEFAULT_CONFIG: ServerConfig = {
       'net', 'netsh',
       'takeown', 'icacls'
     ],
+    blockedArguments: [
+      "--exec", "-e", "/c", "-enc", "-encodedcommand",
+      "-command", "--interactive", "-i", "--login", "--system"
+    ],
     allowedPaths: [
       os.homedir(),
       process.cwd()
@@ -22,7 +26,8 @@ export const DEFAULT_CONFIG: ServerConfig = {
     restrictWorkingDirectory: true,
     logCommands: true,
     maxHistorySize: 1000,
-    commandTimeout: 30
+    commandTimeout: 30,
+    enableInjectionProtection: true
   },
   shells: {
     powershell: {
