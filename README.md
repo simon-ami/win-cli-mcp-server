@@ -17,10 +17,11 @@ MCP server for secure command-line interactions on Windows systems, enabling con
 
 - **Multi-Shell Support**: Execute commands in PowerShell, Command Prompt (CMD), and Git Bash
 - **Security Controls**:
-  - Command validation and filtering
+  - Advanced command blocking (full paths, case variations)
   - Working directory validation
   - Maximum command length limits
   - Command logging and history tracking
+  - Smart argument validation
 - **Configurable**:
   - Custom security rules
   - Shell-specific settings
@@ -145,7 +146,9 @@ The configuration file is divided into two main sections: `security` and `shells
     // Maximum allowed length for any command
     "maxCommandLength": 1000,
 
-    // Commands that contain any of these strings will be blocked
+    // Commands to block - blocks both direct use and full paths
+    // Example: "rm" blocks both "rm" and "C:\\Windows\\System32\\rm.exe"
+    // Case-insensitive: "del" blocks "DEL.EXE", "del.cmd", etc.
     "blockedCommands": [
       "rm", // Delete files
       "del", // Delete files
@@ -162,6 +165,7 @@ The configuration file is divided into two main sections: `security` and `shells
     ],
 
     // Arguments that will be blocked when used with any command
+    // Note: Checks each argument independently - "cd warm_dir" won't be blocked just because "rm" is in blockedCommands
     "blockedArguments": [
       "--exec", // Execution flags
       "-e", // Short execution flags
@@ -190,7 +194,7 @@ The configuration file is divided into two main sections: `security` and `shells
     // Timeout for command execution in seconds (default: 30)
     "commandTimeout": 30,
 
-    // Enable or disable protection against command injection (covers ;, &, |, `)
+    // Enable or disable protection against command injection (covers ;, &, |, \`)
     "enableInjectionProtection": true
   }
 }
@@ -243,7 +247,10 @@ The configuration file is divided into two main sections: `security` and `shells
 
 ## Security Considerations
 
-- Commands containing blocked terms are rejected
+- Commands are blocked based on executable names and full paths
+- Case-insensitive blocking: "DEL.EXE", "del.cmd", etc.
+- Smart path parsing prevents bypassing blocks with alternate paths
+- Command contents are analyzed to avoid false positives (e.g., "warm_dir" is allowed even if "rm" is blocked)
 - Potentially dangerous command arguments are blocked
 - Command injection protection can be enabled or disabled
 - Working directories are validated against allowed paths
@@ -255,11 +262,18 @@ The configuration file is divided into two main sections: `security` and `shells
 
 ## Troubleshooting
 
-- Ensure the config.json path is correct in your Claude Desktop configuration
-- Verify that the specified shells are available on your system
-- Check that the allowed paths exist and are accessible
-- Review the command history for any failed operations
-- Ensure proper permissions for accessing specified directories
+Common issues and solutions:
+
+- Commands blocked unexpectedly: Check for variations in paths/extensions
+- False positives: Command content is analyzed smartly to avoid blocking legitimate commands
+- Shell configuration: Ensure correct executable paths and arguments
+- Directory access: Verify allowed paths and permissions
+
+For detailed error messages, check:
+
+- Console output
+- Command history
+- Specific error details provided in rejections
 
 ## License
 
