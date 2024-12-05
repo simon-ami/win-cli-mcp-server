@@ -1,12 +1,12 @@
 # Windows CLI MCP Server
 
-MCP server for secure command-line interactions on Windows systems, enabling controlled access to PowerShell, CMD, and Git Bash shells. It enables MCP clients (like [Claude Desktop](https://claude.ai/download)) to perform operations on your system, similar to [Open Interpreter](https://github.com/OpenInterpreter/open-interpreter).
+MCP server for secure command-line interactions on Windows systems, enabling controlled access to PowerShell, CMD, Git Bash shells, and remote systems via SSH. It allows MCP clients (like [Claude Desktop](https://claude.ai/download)) to perform operations on your system, similar to [Open Interpreter](https://github.com/OpenInterpreter/open-interpreter).
 
-> ⚠️ **WARNING**: This MCP server provides direct access to your system's command line interface. When enabled, it grants access to your files, environment variables, and command execution capabilities.
+> ⚠️ **WARNING**: This MCP server provides direct access to your system's command line interface and remote systems via SSH. When enabled, it grants access to your files, environment variables, command execution capabilities, and remote server management.
 >
 > Always:
 >
-> - Review and restrict allowed paths
+> - Review and restrict allowed paths and SSH connections
 > - Enable directory restrictions
 > - Configure command blocks
 > - Consider security implications
@@ -16,8 +16,9 @@ MCP server for secure command-line interactions on Windows systems, enabling con
 ## Features
 
 - **Multi-Shell Support**: Execute commands in PowerShell, Command Prompt (CMD), and Git Bash
+- **SSH Support**: Execute commands on remote systems via SSH
 - **Security Controls**:
-  - Advanced command blocking (full paths, case variations)
+  - Command and SSH command blocking (full paths, case variations)
   - Working directory validation
   - Maximum command length limits
   - Command logging and history tracking
@@ -25,10 +26,13 @@ MCP server for secure command-line interactions on Windows systems, enabling con
 - **Configurable**:
   - Custom security rules
   - Shell-specific settings
+  - SSH connection profiles
   - Path restrictions
   - Blocked command lists
 
-**Note**: The server will only allow operations within configured directories and with allowed commands.
+See the [API](#api) section for more details on the tools the server provides to MCP clients.
+
+**Note**: The server will only allow operations within configured directories, with allowed commands, and on configured SSH connections.
 
 ## Usage with Claude Desktop
 
@@ -48,20 +52,36 @@ Add this to your `claude_desktop_config.json`:
 For use with a specific config file, add the `--config` flag:
 
 ```json
-"args": ["-y", "@simonb97/server-win-cli", "--config", "path/to/your/config.json"]
+{
+  "mcpServers": {
+    "windows-cli": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@simonb97/server-win-cli",
+        "--config",
+        "path/to/your/config.json"
+      ]
+    }
+  }
+}
 ```
 
 ## Configuration
 
-The server uses a JSON configuration file to customize its behavior. You can specify settings for security controls and shell configurations.
+The server uses a JSON configuration file to customize its behavior. You can specify settings for security controls, shell configurations, and SSH connections.
 
-To create a default config file, copy `config.json.example` to `config.json`, or run:
+1. To create a default config file, either:
+
+**a)** copy `config.json.example` to `config.json`, or
+
+**b)** run:
 
 ```bash
 npx @simonb97/server-win-cli --init-config ./config.json
 ```
 
-Then set the `--config` flag to point to your config file.
+2. Then set the `--config` flag to point to your config file as described in the [Usage with Claude Desktop](#usage-with-claude-desktop) section.
 
 ### Configuration Locations
 
@@ -71,11 +91,11 @@ The server looks for configuration in the following locations (in order):
 2. ./config.json in current directory
 3. ~/.win-cli-mcp/config.json in user's home directory
 
-If no configuration file is found, the server will use a default (restricted) configuration.
+If no configuration file is found, the server will use a default (restricted) configuration:
 
 ### Default Configuration
 
-If no configuration file is found, the server uses the following default settings:
+**Note**: The default configuration is designed to be restrictive and secure. Find more details on each setting in the [Configuration Settings](#configuration-settings) section.
 
 ```json
 {
@@ -130,13 +150,21 @@ If no configuration file is found, the server uses the following default setting
       "command": "C:\\Program Files\\Git\\bin\\bash.exe",
       "args": ["-c"]
     }
+  },
+  "ssh": {
+    "enabled": false,
+    "defaultTimeout": 30,
+    "maxConcurrentSessions": 5,
+    "keepaliveInterval": 10000,
+    "readyTimeout": 20000,
+    "connections": {}
   }
 }
 ```
 
 ### Configuration Settings
 
-The configuration file is divided into two main sections: `security` and `shells`.
+The configuration file is divided into three main sections: `security`, `shells`, and `ssh`.
 
 #### Security Settings
 
@@ -227,6 +255,52 @@ The configuration file is divided into two main sections: `security` and `shells
 }
 ```
 
+#### SSH Configuration
+
+```json
+{
+  "ssh": {
+    // Enable/disable SSH functionality
+    "enabled": false,
+
+    // Default timeout for SSH commands in seconds
+    "defaultTimeout": 30,
+
+    // Maximum number of concurrent SSH sessions
+    "maxConcurrentSessions": 5,
+
+    // Interval for sending keepalive packets (in milliseconds)
+    "keepaliveInterval": 10000,
+
+    // Timeout for establishing SSH connections (in milliseconds)
+    "readyTimeout": 20000,
+
+    // SSH connection profiles
+    "connections": {
+      // NOTE: these examples are not set in the default config!
+      // Example: Local Raspberry Pi
+      "raspberry-pi": {
+        "host": "raspberrypi.local", // Hostname or IP address
+        "port": 22, // SSH port
+        "username": "pi", // SSH username
+        "password": "raspberry", // Password authentication (if not using key)
+        "keepaliveInterval": 10000, // Connection-specific keepalive
+        "readyTimeout": 20000 // Connection-specific timeout
+      },
+      // Example: Remote server with key authentication
+      "dev-server": {
+        "host": "dev.example.com",
+        "port": 22,
+        "username": "admin",
+        "privateKeyPath": "C:\\Users\\YourUsername\\.ssh\\id_rsa", // Path to private key
+        "keepaliveInterval": 10000,
+        "readyTimeout": 20000
+      }
+    }
+  }
+}
+```
+
 ## API
 
 ### Tools
@@ -241,9 +315,24 @@ The configuration file is divided into two main sections: `security` and `shells
   - Returns command output as text, or error message if execution fails
 
 - **get_command_history**
+
   - Get the history of executed commands
   - Input: `limit` (optional number)
   - Returns timestamped command history with outputs
+
+- **ssh_execute**
+
+  - Execute a command on a remote system via SSH
+  - Inputs:
+    - `connectionId` (string): ID of the SSH connection to use
+    - `command` (string): Command to execute
+  - Returns command output as text, or error message if execution fails
+
+- **ssh_disconnect**
+  - Disconnect from an SSH server
+  - Input:
+    - `connectionId` (string): ID of the SSH connection to disconnect
+  - Returns confirmation message
 
 ## Security Considerations
 

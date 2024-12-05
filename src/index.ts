@@ -17,7 +17,8 @@ import { spawn } from 'child_process';
 import { z } from 'zod';
 import path from 'path';
 import { loadConfig, createDefaultConfig } from './utils/config.js';
-import type { ServerConfig, CommandHistoryEntry } from './types/config.js';
+import type { ServerConfig, CommandHistoryEntry, SSHConnectionConfig } from './types/config.js';
+import { SSHConnectionPool } from './utils/ssh.js';
 
 // Parse command line arguments using yargs
 import yargs from 'yargs/yargs';
@@ -44,6 +45,7 @@ class CLIServer {
   private blockedCommands: Set<string>;
   private commandHistory: CommandHistoryEntry[];
   private config: ServerConfig;
+  private sshPool: SSHConnectionPool;
 
   constructor(config: ServerConfig) {
     this.config = config;
@@ -60,6 +62,7 @@ class CLIServer {
     this.allowedPaths = new Set(config.security.allowedPaths);
     this.blockedCommands = new Set(config.security.blockedCommands);
     this.commandHistory = [];
+    this.sshPool = new SSHConnectionPool();
 
     this.setupHandlers();
   }
@@ -152,6 +155,40 @@ class CLIServer {
                 description: `Maximum number of history entries to return (default: 10, max: ${this.config.security.maxHistorySize})`
               }
             }
+          }
+        },
+        {
+          name: "ssh_execute",
+          description: "Execute a command on a remote host via SSH",
+          inputSchema: {
+            type: "object",
+            properties: {
+              connectionId: {
+                type: "string",
+                description: "ID of the SSH connection to use",
+                enum: Object.keys(this.config.ssh.connections)
+              },
+              command: {
+                type: "string",
+                description: "Command to execute"
+              }
+            },
+            required: ["connectionId", "command"]
+          }
+        },
+        {
+          name: "ssh_disconnect",
+          description: "Disconnect from an SSH server",
+          inputSchema: {
+            type: "object",
+            properties: {
+              connectionId: {
+                type: "string",
+                description: "ID of the SSH connection to disconnect",
+                enum: Object.keys(this.config.ssh.connections)
+              }
+            },
+            required: ["connectionId"]
           }
         }
       ]
@@ -349,6 +386,99 @@ class CLIServer {
             };
           }
 
+          case "ssh_execute": {
+            if (!this.config.ssh.enabled) {
+              throw new McpError(
+                ErrorCode.InvalidRequest,
+                "SSH support is disabled in configuration"
+              );
+            }
+
+            const args = z.object({
+              connectionId: z.string(),
+              command: z.string()
+            }).parse(request.params.arguments);
+
+            const connectionConfig = this.config.ssh.connections[args.connectionId];
+            if (!connectionConfig) {
+              throw new McpError(
+                ErrorCode.InvalidRequest,
+                `Unknown SSH connection ID: ${args.connectionId}`
+              );
+            }
+
+            try {
+              // Validate command
+              this.validateCommand(args.command);
+
+              const connection = await this.sshPool.getConnection(args.connectionId, connectionConfig);
+              const { output, exitCode } = await connection.executeCommand(args.command);
+
+              // Store in history if enabled
+              if (this.config.security.logCommands) {
+                this.commandHistory.push({
+                  command: args.command,
+                  output,
+                  timestamp: new Date().toISOString(),
+                  exitCode,
+                  connectionId: args.connectionId
+                });
+
+                if (this.commandHistory.length > this.config.security.maxHistorySize) {
+                  this.commandHistory = this.commandHistory.slice(-this.config.security.maxHistorySize);
+                }
+              }
+
+              return {
+                content: [{
+                  type: "text",
+                  text: output || 'Command completed successfully (no output)'
+                }],
+                isError: exitCode !== 0,
+                metadata: {
+                  exitCode,
+                  connectionId: args.connectionId
+                }
+              };
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              if (this.config.security.logCommands) {
+                this.commandHistory.push({
+                  command: args.command,
+                  output: `SSH error: ${errorMessage}`,
+                  timestamp: new Date().toISOString(),
+                  exitCode: -1,
+                  connectionId: args.connectionId
+                });
+              }
+              throw new McpError(
+                ErrorCode.InternalError,
+                `SSH error: ${errorMessage}`
+              );
+            }
+          }
+
+          case "ssh_disconnect": {
+            if (!this.config.ssh.enabled) {
+              throw new McpError(
+                ErrorCode.InvalidRequest,
+                "SSH support is disabled in configuration"
+              );
+            }
+
+            const args = z.object({
+              connectionId: z.string()
+            }).parse(request.params.arguments);
+
+            await this.sshPool.closeConnection(args.connectionId);
+            return {
+              content: [{
+                type: "text",
+                text: `Disconnected from ${args.connectionId}`
+              }]
+            };
+          }
+
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -367,8 +497,19 @@ class CLIServer {
     });
   }
 
+  private async cleanup(): Promise<void> {
+    this.sshPool.closeAll();
+  }
+
   async run(): Promise<void> {
     const transport = new StdioServerTransport();
+    
+    // Set up cleanup handler
+    process.on('SIGINT', async () => {
+      await this.cleanup();
+      process.exit(0);
+    });
+    
     await this.server.connect(transport);
     console.error("Windows CLI MCP Server running on stdio");
   }

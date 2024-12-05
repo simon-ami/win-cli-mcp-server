@@ -15,11 +15,13 @@
       "takeown",
       "icacls"
     ],
+    "blockedArguments": ["-rf", "/f", "/s", "/q"],
     "allowedPaths": ["C:\\Users\\YourUsername", "C:\\Projects"],
     "restrictWorkingDirectory": true,
     "logCommands": true,
     "maxHistorySize": 1000,
-    "commandTimeout": 30
+    "commandTimeout": 30,
+    "enableInjectionProtection": true
   },
   "shells": {
     "powershell": {
@@ -36,6 +38,31 @@
       "enabled": true,
       "command": "C:\\Program Files\\Git\\bin\\bash.exe",
       "args": ["-c"]
+    }
+  },
+  "ssh": {
+    "enabled": false,
+    "defaultTimeout": 30,
+    "maxConcurrentSessions": 5,
+    "keepaliveInterval": 10000,
+    "readyTimeout": 20000,
+    "connections": {
+      "raspberry-pi": {
+        "host": "raspberrypi.local",
+        "port": 22,
+        "username": "pi",
+        "password": "raspberry",
+        "keepaliveInterval": 10000,
+        "readyTimeout": 20000
+      },
+      "dev-server": {
+        "host": "dev.example.com",
+        "port": 22,
+        "username": "admin",
+        "privateKeyPath": "C:\\Users\\YourUsername\\.ssh\\id_rsa",
+        "keepaliveInterval": 10000,
+        "readyTimeout": 20000
+      }
     }
   }
 }

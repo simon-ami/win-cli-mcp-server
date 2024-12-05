@@ -17,6 +17,25 @@ export interface ShellConfig {
   validatePath?: (dir: string) => boolean;
 }
 
+export interface SSHConnectionConfig {
+  host: string;
+  port: number;
+  username: string;
+  privateKeyPath?: string;
+  password?: string;
+  keepaliveInterval?: number;
+  readyTimeout?: number;
+}
+
+export interface SSHConfig {
+  enabled: boolean;
+  connections: Record<string, SSHConnectionConfig>;
+  defaultTimeout: number;
+  maxConcurrentSessions: number;
+  keepaliveInterval: number;
+  readyTimeout: number;
+}
+
 export interface ServerConfig {
   security: SecurityConfig;
   shells: {
@@ -24,6 +43,7 @@ export interface ServerConfig {
     cmd: ShellConfig;
     gitbash: ShellConfig;
   };
+  ssh: SSHConfig;
 }
 
 export interface CommandHistoryEntry {
@@ -31,4 +51,5 @@ export interface CommandHistoryEntry {
   output: string;
   timestamp: string;
   exitCode: number;
+  connectionId?: string; // Added for SSH command tracking
 }

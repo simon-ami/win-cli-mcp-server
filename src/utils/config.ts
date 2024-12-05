@@ -48,6 +48,16 @@ export const DEFAULT_CONFIG: ServerConfig = {
       args: ['-c'],
       validatePath: (dir: string) => dir.match(defaultValidatePathRegex) !== null
     }
+  },
+  ssh: {
+    enabled: false,
+    defaultTimeout: 30,
+    maxConcurrentSessions: 5,
+    keepaliveInterval: 10000,
+    readyTimeout: 20000,
+    connections: {
+      
+    }
   }
 };
 
@@ -98,6 +108,16 @@ function mergeConfigs(defaultConfig: ServerConfig, userConfig: Partial<ServerCon
       powershell: userConfig.shells?.powershell || defaultConfig.shells.powershell,
       cmd: userConfig.shells?.cmd || defaultConfig.shells.cmd,
       gitbash: userConfig.shells?.gitbash || defaultConfig.shells.gitbash
+    },
+    ssh: {
+      // Merge SSH config
+      ...(defaultConfig.ssh),
+      ...(userConfig.ssh || {}),
+      // Ensure connections are merged
+      connections: {
+        ...(defaultConfig.ssh.connections),
+        ...(userConfig.ssh?.connections || {})
+      }
     }
   };
 
@@ -131,6 +151,32 @@ function validateConfig(config: ServerConfig): void {
   // Validate timeout (minimum 1 second)
   if (config.security.commandTimeout < 1) {
     throw new Error('commandTimeout must be at least 1 second');
+  }
+
+  // Validate SSH configuration
+  if (config.ssh.enabled) {
+    if (config.ssh.defaultTimeout < 1) {
+      throw new Error('SSH defaultTimeout must be at least 1 second');
+    }
+    if (config.ssh.maxConcurrentSessions < 1) {
+      throw new Error('SSH maxConcurrentSessions must be at least 1');
+    }
+    if (config.ssh.keepaliveInterval < 1000) {
+      throw new Error('SSH keepaliveInterval must be at least 1000ms');
+    }
+    if (config.ssh.readyTimeout < 1000) {
+      throw new Error('SSH readyTimeout must be at least 1000ms');
+    }
+
+    // Validate individual connections
+    for (const [connId, conn] of Object.entries(config.ssh.connections)) {
+      if (!conn.host || !conn.username || (!conn.password && !conn.privateKeyPath)) {
+        throw new Error(`Invalid SSH connection config for '${connId}': missing required fields`);
+      }
+      if (conn.port && (conn.port < 1 || conn.port > 65535)) {
+        throw new Error(`Invalid SSH port for '${connId}': must be between 1 and 65535`);
+      }
+    }
   }
 }
 
