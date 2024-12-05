@@ -254,10 +254,10 @@ class CLIServer {
                 ));
               });
 
-              // Set timeout to prevent hanging
+              // Set configurable timeout to prevent hanging
               const timeout = setTimeout(() => {
                 shellProcess.kill();
-                const timeoutMessage = 'Command execution timed out after 30 seconds';
+                const timeoutMessage = `Command execution timed out after ${this.config.security.commandTimeout} seconds`;
                 if (this.config.security.logCommands) {
                   this.commandHistory.push({
                     command: args.command,
@@ -270,7 +270,7 @@ class CLIServer {
                   ErrorCode.InternalError,
                   timeoutMessage
                 ));
-              }, 30000); // 30 second timeout
+              }, this.config.security.commandTimeout * 1000);
 
               shellProcess.on('close', () => clearTimeout(timeout));
             });

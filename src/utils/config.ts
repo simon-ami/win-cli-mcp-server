@@ -21,7 +21,8 @@ export const DEFAULT_CONFIG: ServerConfig = {
     ],
     restrictWorkingDirectory: true,
     logCommands: true,
-    maxHistorySize: 1000
+    maxHistorySize: 1000,
+    commandTimeout: 30
   },
   shells: {
     powershell: {
@@ -120,6 +121,11 @@ function validateConfig(config: ServerConfig): void {
     if (shell.enabled && (!shell.command || !shell.args)) {
       throw new Error(`Invalid configuration for ${shellName}: missing command or args`);
     }
+  }
+
+  // Validate timeout (minimum 1 second)
+  if (config.security.commandTimeout < 1) {
+    throw new Error('commandTimeout must be at least 1 second');
   }
 }
 

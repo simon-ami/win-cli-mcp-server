@@ -97,7 +97,8 @@ If no configuration file is found, the server uses the following default setting
     "allowedPaths": ["User's home directory", "Current working directory"],
     "restrictWorkingDirectory": true,
     "logCommands": true,
-    "maxHistorySize": 1000
+    "maxHistorySize": 1000,
+    "commandTimeout": 30
   },
   "shells": {
     "powershell": {
@@ -158,7 +159,10 @@ The configuration file is divided into two main sections: `security` and `shells
     "logCommands": true,
 
     // Maximum number of commands to keep in history
-    "maxHistorySize": 1000
+    "maxHistorySize": 1000,
+
+    // Timeout for command execution in seconds (default: 30)
+    "commandTimeout": 30
   }
 }
 ```

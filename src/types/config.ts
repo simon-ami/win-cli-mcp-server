@@ -5,6 +5,7 @@ export interface SecurityConfig {
   restrictWorkingDirectory: boolean;
   logCommands: boolean;
   maxHistorySize: number;
+  commandTimeout: number;
 }
 
 export interface ShellConfig {
