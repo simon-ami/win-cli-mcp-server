@@ -59,13 +59,62 @@ class CLIServer {
   }
 
   private validateCommand(command: string): void {
-    // Check for blocked commands
-    for (const blockedCmd of this.blockedCommands) {
-      if (command.toLowerCase().includes(blockedCmd.toLowerCase())) {
+    // Check for command chaining/injection attempts if enabled
+    if (this.config.security.enableInjectionProtection) {
+      const chainingOperators = /[;&|`]/;  // Covers ;, &, &&, |, ||, and backticks
+      if (chainingOperators.test(command)) {
         throw new McpError(
           ErrorCode.InvalidRequest,
-          `Command contains blocked term: ${blockedCmd}`
+          'Command chaining operators are not allowed (;, &, |, `). Consult the server admin for configuration changes (config.json - enableInjectionProtection).'
         );
+      }
+    }
+
+    // Split command to check the executable and arguments separately
+    const parts = command.trim().split(/\s+/);
+    const executable = parts[0].toLowerCase();
+    const args = parts.slice(1);
+
+    // Check for blocked commands, accounting for common variations
+    for (const blockedCmd of this.blockedCommands) {
+      const blocked = blockedCmd.toLowerCase();
+      
+      // Check exact executable match
+      if (executable === blocked) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Command is blocked: "${blockedCmd}". Consult the server admin for configuration changes (config.json - blockedCommands).`
+        );
+      }
+
+      // Check for command with .exe or .cmd extension
+      if (executable === `${blocked}.exe` || executable === `${blocked}.cmd`) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Command is blocked: "${blockedCmd}". Consult the server admin for configuration changes (config.json - blockedCommands).`
+        );
+      }
+
+      // Check for powershell/cmd prefixed commands (e.g., "del" vs "cmd /c del")
+      if (parts.length > 1 && parts[1].toLowerCase() === blocked) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Command contains blocked term: "${blockedCmd}". Consult the server admin for configuration changes (config.json - blockedCommands).`
+        );
+      }
+    }
+
+    // Validate dangerous argument patterns from config
+    const blockedArguments = this.config.security.blockedArguments.map(arg => new RegExp(`^${this.escapeRegex(arg)}$`, 'i'));
+
+    for (const arg of args) {
+      for (const pattern of blockedArguments) {
+        if (pattern.test(arg.toLowerCase())) {
+          throw new McpError(
+            ErrorCode.InvalidRequest,
+            `Potentially dangerous argument pattern detected: "${arg}". Consult the server admin for configuration changes (config.json - blockedArguments).`
+          );
+        }
       }
     }
 
@@ -73,9 +122,18 @@ class CLIServer {
     if (command.length > this.config.security.maxCommandLength) {
       throw new McpError(
         ErrorCode.InvalidRequest,
-        `Command exceeds maximum length of ${this.config.security.maxCommandLength}`
+        `Command exceeds maximum length of ${this.config.security.maxCommandLength}. Consult the server admin for configuration changes (config.json - maxCommandLength).`
       );
     }
+  }
+
+  /**
+   * Escapes special characters in a string for use in a regular expression
+   * @param text The string to escape
+   * @returns The escaped string
+   */
+  private escapeRegex(text: string): string {
+    return text.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
   }
 
   private setupHandlers(): void {
@@ -155,7 +213,7 @@ class CLIServer {
               if (!isAllowedPath) {
                 throw new McpError(
                   ErrorCode.InvalidRequest,
-                  'Working directory outside allowed paths'
+                  `Working directory (${workingDir}) outside allowed paths. Consult the server admin for configuration changes (config.json - restrictWorkingDirectory, allowedPaths).`
                 );
               }
             }
@@ -168,13 +226,19 @@ class CLIServer {
                 shellProcess = spawn(
                   shellConfig.command,
                   [...shellConfig.args, args.command],
-                  { cwd: workingDir }
+                  { cwd: workingDir, stdio: ['pipe', 'pipe', 'pipe'] }
                 );
               } catch (err) {
-                // Handle spawn errors (e.g., shell executable not found)
                 throw new McpError(
                   ErrorCode.InternalError,
-                  `Failed to start shell process: ${err instanceof Error ? err.message : String(err)}`
+                  `Failed to start shell process: ${err instanceof Error ? err.message : String(err)}. Consult the server admin for configuration changes (config.json - shells).`
+                );
+              }
+
+              if (!shellProcess.stdout || !shellProcess.stderr) {
+                throw new McpError(
+                  ErrorCode.InternalError,
+                  'Failed to initialize shell process streams'
                 );
               }
 
@@ -257,7 +321,7 @@ class CLIServer {
               // Set configurable timeout to prevent hanging
               const timeout = setTimeout(() => {
                 shellProcess.kill();
-                const timeoutMessage = `Command execution timed out after ${this.config.security.commandTimeout} seconds`;
+                const timeoutMessage = `Command execution timed out after ${this.config.security.commandTimeout} seconds. Consult the server admin for configuration changes (config.json - commandTimeout).`;
                 if (this.config.security.logCommands) {
                   this.commandHistory.push({
                     command: args.command,
@@ -281,7 +345,7 @@ class CLIServer {
               return {
                 content: [{
                   type: "text",
-                  text: "Command history is disabled in configuration"
+                  text: "Command history is disabled in configuration. Consult the server admin for configuration changes (config.json - logCommands)."
                 }]
               };
             }

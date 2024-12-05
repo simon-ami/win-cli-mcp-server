@@ -94,11 +94,24 @@ If no configuration file is found, the server uses the following default setting
       "takeown",
       "icacls"
     ],
+    "blockedArguments": [
+      "--exec",
+      "-e",
+      "/c",
+      "-enc",
+      "-encodedcommand",
+      "-command",
+      "--interactive",
+      "-i",
+      "--login",
+      "--system"
+    ],
     "allowedPaths": ["User's home directory", "Current working directory"],
     "restrictWorkingDirectory": true,
     "logCommands": true,
     "maxHistorySize": 1000,
-    "commandTimeout": 30
+    "commandTimeout": 30,
+    "enableInjectionProtection": true
   },
   "shells": {
     "powershell": {
@@ -134,7 +147,6 @@ The configuration file is divided into two main sections: `security` and `shells
 
     // Commands that contain any of these strings will be blocked
     "blockedCommands": [
-      // Suggested defaults
       "rm", // Delete files
       "del", // Delete files
       "rmdir", // Delete directories
@@ -147,6 +159,20 @@ The configuration file is divided into two main sections: `security` and `shells
       "netsh", // Network commands
       "takeown", // Take ownership of files
       "icacls" // Change file permissions
+    ],
+
+    // Arguments that will be blocked when used with any command
+    "blockedArguments": [
+      "--exec", // Execution flags
+      "-e", // Short execution flags
+      "/c", // Command execution in some shells
+      "-enc", // PowerShell encoded commands
+      "-encodedcommand", // PowerShell encoded commands
+      "-command", // Direct PowerShell command execution
+      "--interactive", // Interactive mode which might bypass restrictions
+      "-i", // Short form of interactive
+      "--login", // Login shells might have different permissions
+      "--system" // System level operations
     ],
 
     // List of directories where commands can be executed
@@ -162,7 +188,10 @@ The configuration file is divided into two main sections: `security` and `shells
     "maxHistorySize": 1000,
 
     // Timeout for command execution in seconds (default: 30)
-    "commandTimeout": 30
+    "commandTimeout": 30,
+
+    // Enable or disable protection against command injection (covers ;, &, |, `)
+    "enableInjectionProtection": true
   }
 }
 ```
@@ -215,6 +244,8 @@ The configuration file is divided into two main sections: `security` and `shells
 ## Security Considerations
 
 - Commands containing blocked terms are rejected
+- Potentially dangerous command arguments are blocked
+- Command injection protection can be enabled or disabled
 - Working directories are validated against allowed paths
 - Command length is limited by default
 - Shell processes are properly terminated

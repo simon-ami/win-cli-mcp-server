@@ -1,11 +1,13 @@
 export interface SecurityConfig {
   maxCommandLength: number;
   blockedCommands: string[];
+  blockedArguments: string[];
   allowedPaths: string[];
   restrictWorkingDirectory: boolean;
   logCommands: boolean;
   maxHistorySize: number;
   commandTimeout: number;
+  enableInjectionProtection: boolean;
 }
 
 export interface ShellConfig {
@@ -24,7 +26,7 @@ export interface ServerConfig {
   };
 }
 
-interface CommandHistoryEntry {
+export interface CommandHistoryEntry {
   command: string;
   output: string;
   timestamp: string;

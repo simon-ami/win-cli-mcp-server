@@ -18,7 +18,8 @@
     "allowedPaths": ["C:\\Users\\YourUsername", "C:\\Projects"],
     "restrictWorkingDirectory": true,
     "logCommands": true,
-    "maxHistorySize": 1000
+    "maxHistorySize": 1000,
+    "commandTimeout": 30
   },
   "shells": {
     "powershell": {
