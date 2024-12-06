@@ -19,6 +19,9 @@ import path from 'path';
 import { loadConfig, createDefaultConfig } from './utils/config.js';
 import type { ServerConfig, CommandHistoryEntry, SSHConnectionConfig } from './types/config.js';
 import { SSHConnectionPool } from './utils/ssh.js';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const packageJson = require('../package.json');
 
 // Parse command line arguments using yargs
 import yargs from 'yargs/yargs';
@@ -51,7 +54,7 @@ class CLIServer {
     this.config = config;
     this.server = new Server({
       name: "windows-cli-server",
-      version: "0.1.0",
+      version: packageJson.version,
     }, {
       capabilities: {
         tools: {}
