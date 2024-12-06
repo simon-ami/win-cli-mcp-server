@@ -6,13 +6,56 @@ export class SSHConnection {
   private client: Client;
   private config: SSHConnectionConfig;
   private isConnected: boolean = false;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private lastActivity: number = Date.now();
 
   constructor(config: SSHConnectionConfig) {
     this.client = new Client();
     this.config = config;
+    this.setupClientEvents();
+  }
+
+  private setupClientEvents() {
+    this.client
+      .on('error', (err) => {
+        console.error(`SSH connection error for ${this.config.host}:`, err.message);
+        this.isConnected = false;
+        this.scheduleReconnect();
+      })
+      .on('end', () => {
+        console.error(`SSH connection ended for ${this.config.host}`);
+        this.isConnected = false;
+        this.scheduleReconnect();
+      })
+      .on('close', () => {
+        console.error(`SSH connection closed for ${this.config.host}`);
+        this.isConnected = false;
+        this.scheduleReconnect();
+      });
+  }
+
+  private scheduleReconnect() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
+
+    // Only attempt reconnect if there was recent activity
+    const timeSinceLastActivity = Date.now() - this.lastActivity;
+    if (timeSinceLastActivity < 30 * 60 * 1000) { // 30 minutes
+      this.reconnectTimer = setTimeout(() => {
+        console.error(`Attempting to reconnect to ${this.config.host}...`);
+        this.connect().catch(err => {
+          console.error(`Reconnection failed for ${this.config.host}:`, err.message);
+        });
+      }, 5000); // Wait 5 seconds before reconnecting
+    }
   }
 
   async connect(): Promise<void> {
+    if (this.isConnected) {
+      return;
+    }
+
     return new Promise(async (resolve, reject) => {
       try {
         const connectionConfig: any = {
@@ -20,6 +63,7 @@ export class SSHConnection {
           port: this.config.port,
           username: this.config.username,
           keepaliveInterval: this.config.keepaliveInterval || 10000,
+          keepaliveCountMax: this.config.keepaliveCountMax || 3,
           readyTimeout: this.config.readyTimeout || 20000,
         };
 
@@ -36,6 +80,7 @@ export class SSHConnection {
         this.client
           .on('ready', () => {
             this.isConnected = true;
+            this.lastActivity = Date.now();
             resolve();
           })
           .on('error', (err) => {
@@ -49,12 +94,14 @@ export class SSHConnection {
   }
 
   async executeCommand(command: string): Promise<{ output: string; exitCode: number }> {
-    return new Promise((resolve, reject) => {
-      if (!this.isConnected) {
-        reject(new Error('Not connected to SSH server'));
-        return;
-      }
+    this.lastActivity = Date.now();
 
+    // Check connection and attempt reconnect if needed
+    if (!this.isConnected) {
+      await this.connect();
+    }
+
+    return new Promise((resolve, reject) => {
       this.client.exec(command, (err, stream) => {
         if (err) {
           reject(err);
@@ -73,6 +120,7 @@ export class SSHConnection {
           });
 
         stream.on('close', (code: number) => {
+          this.lastActivity = Date.now();
           resolve({
             output: output || errorOutput,
             exitCode: code || 0
@@ -83,6 +131,11 @@ export class SSHConnection {
   }
 
   disconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    
     if (this.isConnected) {
       this.client.end();
       this.isConnected = false;

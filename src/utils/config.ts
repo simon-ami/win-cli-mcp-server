@@ -54,10 +54,9 @@ export const DEFAULT_CONFIG: ServerConfig = {
     defaultTimeout: 30,
     maxConcurrentSessions: 5,
     keepaliveInterval: 10000,
+    keepaliveCountMax: 3,
     readyTimeout: 20000,
-    connections: {
-      
-    }
+    connections: {}
   }
 };
 

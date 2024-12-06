@@ -24,6 +24,7 @@ export interface SSHConnectionConfig {
   privateKeyPath?: string;
   password?: string;
   keepaliveInterval?: number;
+  keepaliveCountMax?: number;
   readyTimeout?: number;
 }
 
@@ -33,6 +34,7 @@ export interface SSHConfig {
   defaultTimeout: number;
   maxConcurrentSessions: number;
   keepaliveInterval: number;
+  keepaliveCountMax: number;
   readyTimeout: number;
 }
 

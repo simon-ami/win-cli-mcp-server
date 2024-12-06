@@ -156,6 +156,7 @@ If no configuration file is found, the server will use a default (restricted) co
     "defaultTimeout": 30,
     "maxConcurrentSessions": 5,
     "keepaliveInterval": 10000,
+    "keepaliveCountMax": 3,
     "readyTimeout": 20000,
     "connections": {}
   }
@@ -272,6 +273,9 @@ The configuration file is divided into three main sections: `security`, `shells`
     // Interval for sending keepalive packets (in milliseconds)
     "keepaliveInterval": 10000,
 
+    // Maximum number of failed keepalive attempts before disconnecting
+    "keepaliveCountMax": 3,
+
     // Timeout for establishing SSH connections (in milliseconds)
     "readyTimeout": 20000,
 
@@ -284,8 +288,9 @@ The configuration file is divided into three main sections: `security`, `shells`
         "port": 22, // SSH port
         "username": "pi", // SSH username
         "password": "raspberry", // Password authentication (if not using key)
-        "keepaliveInterval": 10000, // Connection-specific keepalive
-        "readyTimeout": 20000 // Connection-specific timeout
+        "keepaliveInterval": 10000, // Override global keepaliveInterval
+        "keepaliveCountMax": 3, // Override global keepaliveCountMax
+        "readyTimeout": 20000 // Override global readyTimeout
       },
       // Example: Remote server with key authentication
       "dev-server": {
@@ -294,6 +299,7 @@ The configuration file is divided into three main sections: `security`, `shells`
         "username": "admin",
         "privateKeyPath": "C:\\Users\\YourUsername\\.ssh\\id_rsa", // Path to private key
         "keepaliveInterval": 10000,
+        "keepaliveCountMax": 3,
         "readyTimeout": 20000
       }
     }
@@ -348,21 +354,6 @@ The configuration file is divided into three main sections: `security`, `shells`
 - All inputs are validated before execution
 - Environment variables and personal files may be accessible within allowed paths
 - Consider limiting access to sensitive directories and environment information
-
-## Troubleshooting
-
-Common issues and solutions:
-
-- Commands blocked unexpectedly: Check for variations in paths/extensions
-- False positives: Command content is analyzed smartly to avoid blocking legitimate commands
-- Shell configuration: Ensure correct executable paths and arguments
-- Directory access: Verify allowed paths and permissions
-
-For detailed error messages, check:
-
-- Console output
-- Command history
-- Specific error details provided in rejections
 
 ## License
 
