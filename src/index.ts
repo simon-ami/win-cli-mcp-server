@@ -124,7 +124,34 @@ class CLIServer {
       tools: [
         {
           name: "execute_command",
-          description: "Execute a command in the specified shell (powershell, cmd, or gitbash)",
+          description: `Execute a command in the specified shell (powershell, cmd, or gitbash)
+
+Example usage (PowerShell):
+\`\`\`json
+{
+  "shell": "powershell",
+  "command": "Get-Process | Select-Object -First 5",
+  "workingDir": "C:\\Users\\username"
+}
+\`\`\`
+
+Example usage (CMD):
+\`\`\`json
+{
+  "shell": "cmd",
+  "command": "dir /b",
+  "workingDir": "C:\\Projects"
+}
+\`\`\`
+
+Example usage (Git Bash):
+\`\`\`json
+{
+  "shell": "gitbash",
+  "command": "ls -la",
+  "workingDir": "/c/Users/username"
+}
+\`\`\``,
           inputSchema: {
             type: "object",
             properties: {
@@ -149,7 +176,26 @@ class CLIServer {
         },
         {
           name: "get_command_history",
-          description: "Get the history of executed commands",
+          description: `Get the history of executed commands
+
+Example usage:
+\`\`\`json
+{
+  "limit": 5
+}
+\`\`\`
+
+Example response:
+\`\`\`json
+[
+  {
+    "command": "Get-Process",
+    "output": "...",
+    "timestamp": "2024-03-20T10:30:00Z",
+    "exitCode": 0
+  }
+]
+\`\`\``,
           inputSchema: {
             type: "object",
             properties: {
@@ -162,7 +208,32 @@ class CLIServer {
         },
         {
           name: "ssh_execute",
-          description: "Execute a command on a remote host via SSH",
+          description: `Execute a command on a remote host via SSH
+
+Example usage:
+\`\`\`json
+{
+  "connectionId": "raspberry-pi",
+  "command": "uname -a"
+}
+\`\`\`
+
+Configuration required in config.json:
+\`\`\`json
+{
+  "ssh": {
+    "enabled": true,
+    "connections": {
+      "raspberry-pi": {
+        "host": "raspberrypi.local",
+        "port": 22,
+        "username": "pi",
+        "password": "raspberry"
+      }
+    }
+  }
+}
+\`\`\``,
           inputSchema: {
             type: "object",
             properties: {
@@ -181,7 +252,16 @@ class CLIServer {
         },
         {
           name: "ssh_disconnect",
-          description: "Disconnect from an SSH server",
+          description: `Disconnect from an SSH server
+
+Example usage:
+\`\`\`json
+{
+  "connectionId": "raspberry-pi"
+}
+\`\`\`
+
+Use this to cleanly close SSH connections when they're no longer needed.`,
           inputSchema: {
             type: "object",
             properties: {
