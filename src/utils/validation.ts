@@ -1,6 +1,7 @@
 import path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import type { ShellConfig } from '../types/config.js';
 const execAsync = promisify(exec);
 
 export async function resolveCommandPath(command: string): Promise<string | null> {
@@ -35,6 +36,26 @@ export function isArgumentBlocked(args: string[], blockedArguments: string[]): b
             new RegExp(`^${blocked}$`, 'i').test(arg)
         )
     );
+}
+
+/**
+ * Validates a command for a specific shell, checking for shell-specific blocked operators
+ */
+export function validateShellOperators(command: string, shellConfig: ShellConfig): void {
+    // Skip validation if shell doesn't specify blocked operators
+    if (!shellConfig.blockedOperators?.length) {
+        return;
+    }
+
+    // Create regex pattern from blocked operators
+    const operatorPattern = shellConfig.blockedOperators
+        .map(op => op.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))  // Escape regex special chars
+        .join('|');
+    
+    const regex = new RegExp(operatorPattern);
+    if (regex.test(command)) {
+        throw new Error(`Command contains blocked operators for this shell: ${shellConfig.blockedOperators.join(', ')}`);
+    }
 }
 
 /**

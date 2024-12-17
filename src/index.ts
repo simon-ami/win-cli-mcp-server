@@ -11,7 +11,8 @@ import {
   isCommandBlocked,
   isArgumentBlocked,
   parseCommand,
-  extractCommandName
+  extractCommandName,
+  validateShellOperators
 } from './utils/validation.js';
 import { spawn } from 'child_process';
 import { z } from 'zod';
@@ -70,20 +71,18 @@ class CLIServer {
     this.setupHandlers();
   }
 
-  private validateCommand(command: string): void {
+  private validateCommand(shell: keyof ServerConfig['shells'], command: string): void {
     // Check for command chaining/injection attempts if enabled
     if (this.config.security.enableInjectionProtection) {
-      const chainingOperators = /[;&|`]/;
-      if (chainingOperators.test(command)) {
-        throw new McpError(
-          ErrorCode.InvalidRequest,
-          'Command chaining operators are not allowed (;, &, |, `)'
-        );
-      }
+      // Get shell-specific config
+      const shellConfig = this.config.shells[shell];
+      
+      // Use shell-specific operator validation
+      validateShellOperators(command, shellConfig);
     }
-
+  
     const { command: executable, args } = parseCommand(command);
-
+  
     // Check for blocked commands
     if (isCommandBlocked(executable, Array.from(this.blockedCommands))) {
       throw new McpError(
@@ -91,7 +90,7 @@ class CLIServer {
         `Command is blocked: "${extractCommandName(executable)}"`
       );
     }
-
+  
     // Check for blocked arguments
     if (isArgumentBlocked(args, this.config.security.blockedArguments)) {
       throw new McpError(
@@ -99,7 +98,7 @@ class CLIServer {
         'One or more arguments are blocked. Check configuration for blocked patterns.'
       );
     }
-
+  
     // Validate command length
     if (command.length > this.config.security.maxCommandLength) {
       throw new McpError(
@@ -291,7 +290,7 @@ Use this to cleanly close SSH connections when they're no longer needed.`,
             }).parse(request.params.arguments);
 
             // Validate command
-            this.validateCommand(args.command);
+            this.validateCommand(args.shell as keyof ServerConfig['shells'], args.command);
 
             // Validate working directory if provided
             let workingDir = args.workingDir ? 
@@ -492,7 +491,7 @@ Use this to cleanly close SSH connections when they're no longer needed.`,
 
             try {
               // Validate command
-              this.validateCommand(args.command);
+              this.validateCommand('cmd', args.command);
 
               const connection = await this.sshPool.getConnection(args.connectionId, connectionConfig);
               const { output, exitCode } = await connection.executeCommand(args.command);

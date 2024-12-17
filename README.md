@@ -138,17 +138,20 @@ If no configuration file is found, the server will use a default (restricted) co
     "powershell": {
       "enabled": true,
       "command": "powershell.exe",
-      "args": ["-NoProfile", "-NonInteractive", "-Command"]
+      "args": ["-NoProfile", "-NonInteractive", "-Command"],
+      "blockedOperators": ["&", "|", ";", "`"]
     },
     "cmd": {
       "enabled": true,
       "command": "cmd.exe",
-      "args": ["/c"]
+      "args": ["/c"],
+      "blockedOperators": ["&", "|", ";", "`"]
     },
     "gitbash": {
       "enabled": true,
       "command": "C:\\Program Files\\Git\\bin\\bash.exe",
-      "args": ["-c"]
+      "args": ["-c"],
+      "blockedOperators": ["&", "|", ";", "`"]
     }
   },
   "ssh": {
@@ -240,17 +243,21 @@ The configuration file is divided into three main sections: `security`, `shells`
       // Path to shell executable
       "command": "powershell.exe",
       // Default arguments for the shell
-      "args": ["-NoProfile", "-NonInteractive", "-Command"]
+      "args": ["-NoProfile", "-NonInteractive", "-Command"],
+      // Optional: Specify which command operators to block
+      "blockedOperators": ["&", "|", ";", "`"]  // Block all command chaining
     },
     "cmd": {
       "enabled": true,
       "command": "cmd.exe",
-      "args": ["/c"]
+      "args": ["/c"],
+      "blockedOperators": ["&", "|", ";", "`"]  // Block all command chaining
     },
     "gitbash": {
       "enabled": true,
       "command": "C:\\Program Files\\Git\\bin\\bash.exe",
-      "args": ["-c"]
+      "args": ["-c"],
+      "blockedOperators": ["&", "|", ";", "`"]  // Block all command chaining
     }
   }
 }

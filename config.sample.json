@@ -27,17 +27,20 @@
     "powershell": {
       "enabled": true,
       "command": "powershell.exe",
-      "args": ["-NoProfile", "-NonInteractive", "-Command"]
+      "args": ["-NoProfile", "-NonInteractive", "-Command"],
+      "blockedOperators": ["&", "|", ";", "`"]
     },
     "cmd": {
       "enabled": true,
       "command": "cmd.exe",
-      "args": ["/c"]
+      "args": ["/c"],
+      "blockedOperators": ["&", "|", ";", "`"]
     },
     "gitbash": {
       "enabled": true,
       "command": "C:\\Program Files\\Git\\bin\\bash.exe",
-      "args": ["-c"]
+      "args": ["-c"],
+      "blockedOperators": ["&", "|", ";", "`"]
     }
   },
   "ssh": {

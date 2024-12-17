@@ -15,6 +15,7 @@ export interface ShellConfig {
   command: string;
   args: string[];
   validatePath?: (dir: string) => boolean;
+  blockedOperators?: string[]; // Added for shell-specific operator restrictions
 }
 
 export interface SSHConnectionConfig {
@@ -53,5 +54,5 @@ export interface CommandHistoryEntry {
   output: string;
   timestamp: string;
   exitCode: number;
-  connectionId?: string; // Added for SSH command tracking
+  connectionId?: string;
 }

@@ -34,19 +34,22 @@ export const DEFAULT_CONFIG: ServerConfig = {
       enabled: true,
       command: 'powershell.exe',
       args: ['-NoProfile', '-NonInteractive', '-Command'],
-      validatePath: (dir: string) => dir.match(defaultValidatePathRegex) !== null
+      validatePath: (dir: string) => dir.match(defaultValidatePathRegex) !== null,
+      blockedOperators: ['&', '|', ';', '`']
     },
     cmd: {
       enabled: true,
       command: 'cmd.exe',
       args: ['/c'],
-      validatePath: (dir: string) => dir.match(defaultValidatePathRegex) !== null
+      validatePath: (dir: string) => dir.match(defaultValidatePathRegex) !== null,
+      blockedOperators: ['&', '|', ';', '`']
     },
     gitbash: {
       enabled: true,
       command: 'C:\\Program Files\\Git\\bin\\bash.exe',
       args: ['-c'],
-      validatePath: (dir: string) => dir.match(defaultValidatePathRegex) !== null
+      validatePath: (dir: string) => dir.match(defaultValidatePathRegex) !== null,
+      blockedOperators: ['&', '|', ';', '`']
     }
   },
   ssh: {
@@ -120,10 +123,13 @@ function mergeConfigs(defaultConfig: ServerConfig, userConfig: Partial<ServerCon
     }
   };
 
-  // Only add validatePath functions if they don't exist
+  // Only add validatePath functions and blocked operators if they don't exist
   for (const [key, shell] of Object.entries(merged.shells) as [keyof typeof merged.shells, ShellConfig][]) {
     if (!shell.validatePath) {
       shell.validatePath = defaultConfig.shells[key].validatePath;
+    }
+    if (!shell.blockedOperators) {
+      shell.blockedOperators = defaultConfig.shells[key].blockedOperators;
     }
   }
 
