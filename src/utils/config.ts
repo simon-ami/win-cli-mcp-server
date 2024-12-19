@@ -27,7 +27,11 @@ export const DEFAULT_CONFIG: ServerConfig = {
     logCommands: true,
     maxHistorySize: 1000,
     commandTimeout: 30,
-    enableInjectionProtection: true
+    enableInjectionProtection: true,
+    maxOutputSize: 512 * 1024 * 1024 - 1024 * 1024, // 511MB (1MB safety buffer)
+    enableOutputFiles: false,
+    outputDirectory: undefined,
+    outputFileRetentionHours: 24
   },
   shells: {
     powershell: {
@@ -64,7 +68,6 @@ export const DEFAULT_CONFIG: ServerConfig = {
 };
 
 export function loadConfig(configPath?: string): ServerConfig {
-  // If no config path provided, look in default locations
   const configLocations = [
     configPath,
     path.join(process.cwd(), 'config.json'),
@@ -88,12 +91,10 @@ export function loadConfig(configPath?: string): ServerConfig {
     }
   }
 
-  // Use defaults only if no config was loaded
   const mergedConfig = Object.keys(loadedConfig).length > 0 
     ? mergeConfigs(DEFAULT_CONFIG, loadedConfig)
     : DEFAULT_CONFIG;
 
-  // Validate the merged config
   validateConfig(mergedConfig);
 
   return mergedConfig;
@@ -102,20 +103,16 @@ export function loadConfig(configPath?: string): ServerConfig {
 function mergeConfigs(defaultConfig: ServerConfig, userConfig: Partial<ServerConfig>): ServerConfig {
   const merged: ServerConfig = {
     security: {
-      // If user provided security config, use it entirely, otherwise use default
       ...(userConfig.security || defaultConfig.security)
     },
     shells: {
-      // Same for each shell - if user provided config, use it entirely
       powershell: userConfig.shells?.powershell || defaultConfig.shells.powershell,
       cmd: userConfig.shells?.cmd || defaultConfig.shells.cmd,
       gitbash: userConfig.shells?.gitbash || defaultConfig.shells.gitbash
     },
     ssh: {
-      // Merge SSH config
       ...(defaultConfig.ssh),
       ...(userConfig.ssh || {}),
-      // Ensure connections are merged
       connections: {
         ...(defaultConfig.ssh.connections),
         ...(userConfig.ssh?.connections || {})
@@ -123,7 +120,6 @@ function mergeConfigs(defaultConfig: ServerConfig, userConfig: Partial<ServerCon
     }
   };
 
-  // Only add validatePath functions and blocked operators if they don't exist
   for (const [key, shell] of Object.entries(merged.shells) as [keyof typeof merged.shells, ShellConfig][]) {
     if (!shell.validatePath) {
       shell.validatePath = defaultConfig.shells[key].validatePath;
@@ -136,8 +132,7 @@ function mergeConfigs(defaultConfig: ServerConfig, userConfig: Partial<ServerCon
   return merged;
 }
 
-function validateConfig(config: ServerConfig): void {
-  // Validate security settings
+export function validateConfig(config: ServerConfig): void {
   if (config.security.maxCommandLength < 1) {
     throw new Error('maxCommandLength must be positive');
   }
@@ -146,19 +141,16 @@ function validateConfig(config: ServerConfig): void {
     throw new Error('maxHistorySize must be positive');
   }
 
-  // Validate shell configurations
   for (const [shellName, shell] of Object.entries(config.shells)) {
     if (shell.enabled && (!shell.command || !shell.args)) {
       throw new Error(`Invalid configuration for ${shellName}: missing command or args`);
     }
   }
 
-  // Validate timeout (minimum 1 second)
   if (config.security.commandTimeout < 1) {
     throw new Error('commandTimeout must be at least 1 second');
   }
 
-  // Validate SSH configuration
   if (config.ssh.enabled) {
     if (config.ssh.defaultTimeout < 1) {
       throw new Error('SSH defaultTimeout must be at least 1 second');
@@ -173,7 +165,6 @@ function validateConfig(config: ServerConfig): void {
       throw new Error('SSH readyTimeout must be at least 1000ms');
     }
 
-    // Validate individual connections
     for (const [connId, conn] of Object.entries(config.ssh.connections)) {
       if (!conn.host || !conn.username || (!conn.password && !conn.privateKeyPath)) {
         throw new Error(`Invalid SSH connection config for '${connId}': missing required fields`);
@@ -183,9 +174,37 @@ function validateConfig(config: ServerConfig): void {
       }
     }
   }
+
+  if (config.security.maxOutputSize < 1024 * 1024) {
+    throw new Error('maxOutputSize must be at least 1MB');
+  }
+
+  if (config.security.outputFileRetentionHours < 1) {
+    throw new Error('outputFileRetentionHours must be at least 1');
+  }
+
+  if (config.security.enableOutputFiles) {
+    const outputDir = config.security.outputDirectory || path.join(os.tmpdir(), 'win-cli-mcp-output');
+    try {
+      fs.mkdirSync(outputDir, { recursive: true });
+
+      const testFile = path.join(outputDir, '.write-test');
+      fs.writeFileSync(testFile, '');
+      fs.unlinkSync(testFile);
+
+      if (!config.security.outputDirectory) {
+        config.security.outputDirectory = outputDir;
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to setup output directory (${outputDir}): ${error.message}`);
+      } else {
+        throw new Error(`Failed to setup output directory (${outputDir}): ${String(error)}`);
+      }
+    }
+  }
 }
 
-// Helper function to create a default config file
 export function createDefaultConfig(configPath: string): void {
   const dirPath = path.dirname(configPath);
   
@@ -193,7 +212,6 @@ export function createDefaultConfig(configPath: string): void {
     fs.mkdirSync(dirPath, { recursive: true });
   }
 
-  // Create a JSON-safe version of the config (excluding functions)
   const configForSave = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
   fs.writeFileSync(configPath, JSON.stringify(configForSave, null, 2));
 }

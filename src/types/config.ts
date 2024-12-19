@@ -8,6 +8,10 @@ export interface SecurityConfig {
   maxHistorySize: number;
   commandTimeout: number;
   enableInjectionProtection: boolean;
+  maxOutputSize: number;           
+  enableOutputFiles: boolean;
+  outputDirectory?: string;        
+  outputFileRetentionHours: number;
 }
 
 export interface ShellConfig {
@@ -15,7 +19,7 @@ export interface ShellConfig {
   command: string;
   args: string[];
   validatePath?: (dir: string) => boolean;
-  blockedOperators?: string[]; // Added for shell-specific operator restrictions
+  blockedOperators?: string[];
 }
 
 export interface SSHConnectionConfig {

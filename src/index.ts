@@ -21,6 +21,8 @@ import { loadConfig, createDefaultConfig } from './utils/config.js';
 import type { ServerConfig, CommandHistoryEntry, SSHConnectionConfig } from './types/config.js';
 import { SSHConnectionPool } from './utils/ssh.js';
 import { createRequire } from 'module';
+import fs from 'fs';
+import os from 'os';
 const require = createRequire(import.meta.url);
 const packageJson = require('../package.json');
 
@@ -339,21 +341,79 @@ Use this to cleanly close SSH connections when they're no longer needed.`,
 
               let output = '';
               let error = '';
+              let outputSize = 0;
+              let truncated = false;
+              let outputFilePath: string | undefined;
+
+              // Function to save output to file
+              const saveToFile = (content: string) => {
+                if (!this.config.security.outputDirectory) return;
+                
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `output-${timestamp}.txt`;
+                outputFilePath = path.join(this.config.security.outputDirectory, filename);
+                
+                fs.writeFileSync(outputFilePath, content, 'utf8');
+                return outputFilePath;
+              };
 
               shellProcess.stdout.on('data', (data) => {
-                output += data.toString();
+                const chunk = data.toString();
+                if (outputSize + chunk.length <= this.config.security.maxOutputSize) {
+                  output += chunk;
+                  outputSize += chunk.length;
+                } else if (this.config.security.enableOutputFiles) {
+                  // If this is the first time we're exceeding the limit
+                  if (!truncated) {
+                    // Save current output to file
+                    output += chunk;
+                    const filePath = saveToFile(output);
+                    // Reset output to just show truncation message
+                    output = `Output exceeded ${this.config.security.maxOutputSize / (1024 * 1024)}MB limit.\n`;
+                    if (filePath) {
+                      output += `Full output saved to: ${filePath}\n`;
+                    }
+                    truncated = true;
+                  } else {
+                    // Append to existing file
+                    if (outputFilePath) {
+                      fs.appendFileSync(outputFilePath, chunk);
+                    }
+                  }
+                } else if (!truncated) {
+                  output += '\n... Output truncated due to size limit ...';
+                  truncated = true;
+                }
               });
 
               shellProcess.stderr.on('data', (data) => {
-                error += data.toString();
+                const chunk = data.toString();
+                if (outputSize + chunk.length <= this.config.security.maxOutputSize) {
+                  error += chunk;
+                  outputSize += chunk.length;
+                } else if (!truncated) {
+                  error += '\n... Error output truncated due to size limit ...';
+                  truncated = true;
+                }
               });
 
               shellProcess.on('close', (code) => {
-                // Prepare detailed result message
                 let resultMessage = '';
                 
                 if (code === 0) {
                   resultMessage = output || 'Command completed successfully (no output)';
+                  if (truncated) {
+                    if (outputFilePath) {
+                      resultMessage += `\n\nOutput exceeded ${this.config.security.maxOutputSize / (1024 * 1024)}MB limit and was saved to:\n${outputFilePath}`;
+                    } else {
+                      resultMessage += `\n\nOutput exceeded ${this.config.security.maxOutputSize / (1024 * 1024)}MB limit and was truncated.\nTo save large outputs to files, enable 'enableOutputFiles' in your config.json`;
+                      if (this.config?.security?.outputDirectory) {
+                        resultMessage += `\nOutputs will be saved to: ${this.config.security.outputDirectory}`;
+                      } else {
+                        resultMessage += `\nOutputs will be saved to: ${path.join(os.tmpdir(), 'win-cli-mcp-output')}`;
+                      }
+                    }
+                  }
                 } else {
                   resultMessage = `Command failed with exit code ${code}\n`;
                   if (error) {
@@ -364,6 +424,20 @@ Use this to cleanly close SSH connections when they're no longer needed.`,
                   }
                   if (!error && !output) {
                     resultMessage += 'No error message or output was provided';
+                  }
+                  
+                  // Inform about truncation if needed
+                  if (truncated) {
+                    if (outputFilePath) {
+                      resultMessage += `\n\nOutput exceeded ${this.config.security.maxOutputSize / (1024 * 1024)}MB limit and was saved to:\n${outputFilePath}`;
+                    } else {
+                      resultMessage += `\n\nOutput exceeded ${this.config.security.maxOutputSize / (1024 * 1024)}MB limit and was truncated.\nTo save large outputs to files, enable 'enableOutputFiles' in your config.json`;
+                      if (this.config?.security?.outputDirectory) {
+                        resultMessage += `\nOutputs will be saved to: ${this.config.security.outputDirectory}`;
+                      } else {
+                        resultMessage += `\nOutputs will be saved to: ${path.join(os.tmpdir(), 'win-cli-mcp-output')}`;
+                      }
+                    }
                   }
                 }
 
@@ -379,6 +453,26 @@ Use this to cleanly close SSH connections when they're no longer needed.`,
                   // Trim history if needed
                   if (this.commandHistory.length > this.config.security.maxHistorySize) {
                     this.commandHistory = this.commandHistory.slice(-this.config.security.maxHistorySize);
+                  }
+                }
+
+                // Clean up old output files
+                if (this.config.security.enableOutputFiles && this.config.security.outputDirectory) {
+                  try {
+                    const retentionMs = this.config.security.outputFileRetentionHours * 60 * 60 * 1000;
+                    const cutoffTime = Date.now() - retentionMs;
+                    
+                    fs.readdirSync(this.config.security.outputDirectory)
+                      .filter(file => file.startsWith('output-'))
+                      .map(file => path.join(this.config.security.outputDirectory!, file))
+                      .forEach(filePath => {
+                        const stats = fs.statSync(filePath);
+                        if (stats.mtimeMs < cutoffTime) {
+                          fs.unlinkSync(filePath);
+                        }
+                      });
+                  } catch (error) {
+                    console.error('Error cleaning up old output files:', error);
                   }
                 }
 
