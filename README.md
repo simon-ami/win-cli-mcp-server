@@ -1,5 +1,8 @@
 # Windows CLI MCP Server
 [![smithery badge](https://smithery.ai/badge/@simonb97/server-win-cli)](https://smithery.ai/server/@simonb97/server-win-cli)
+[![NPM Version](https://img.shields.io/npm/v/@simonb97/server-win-cli.svg?style=flat)]()
+[![NPM License](https://img.shields.io/npm/l/@simonb97/server-win-cli.svg?style=flat)](https://github.com/simonb97/server-win-cli/blob/master/LICENSE)
+[![NPM Downloads](https://img.shields.io/npm/dt/@simonb97/server-win-cli.svg?style=flat)]()
 
 MCP server for secure command-line interactions on Windows systems, enabling controlled access to PowerShell, CMD, Git Bash shells, and remote systems via SSH. It allows MCP clients (like [Claude Desktop](https://claude.ai/download)) to perform operations on your system, similar to [Open Interpreter](https://github.com/OpenInterpreter/open-interpreter).
 
