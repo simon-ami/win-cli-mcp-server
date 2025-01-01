@@ -17,6 +17,22 @@ MCP server for secure command-line interactions on Windows systems, enabling con
 >
 > See [Configuration](#configuration) for more details.
 
+---
+
+- [Features](#features)
+- [Usage with Claude Desktop](#usage-with-claude-desktop)
+- [Configuration](#configuration)
+  - [Configuration Locations](#configuration-locations)
+  - [Default Configuration](#default-configuration)
+  - [Configuration Settings](#configuration-settings)
+    - [Security Settings](#security-settings)
+    - [Shell Configuration](#shell-configuration)
+    - [SSH Configuration](#ssh-configuration)
+- [API](#api)
+  - [Tools](#tools)
+- [Security Considerations](#security-considerations)
+- [License](#license)
+
 ## Features
 
 - **Multi-Shell Support**: Execute commands in PowerShell, Command Prompt (CMD), and Git Bash
