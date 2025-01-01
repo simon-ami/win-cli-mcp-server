@@ -17,7 +17,7 @@ export function extractCommandName(command: string): string {
     // Remove any path components
     const basename = path.basename(command);
     // Remove extension
-    return basename.replace(/\.(exe|cmd|bat)$/i, '');
+    return basename.replace(/\.(exe|cmd|bat)$/i, '').toLowerCase();
 }
 
 export function isCommandBlocked(command: string, blockedCommands: string[]): boolean {
