@@ -1,5 +1,4 @@
 # Windows CLI MCP Server
-[![NPM License](https://img.shields.io/npm/l/@simonb97/server-win-cli.svg?style=flat)](https://github.com/simonb97/server-win-cli/blob/master/LICENSE)
 [![NPM Downloads](https://img.shields.io/npm/dt/@simonb97/server-win-cli.svg?style=flat)]()
 [![NPM Version](https://img.shields.io/npm/v/@simonb97/server-win-cli.svg?style=flat)]()
 [![smithery badge](https://smithery.ai/badge/@simonb97/server-win-cli)](https://smithery.ai/server/@simonb97/server-win-cli)
