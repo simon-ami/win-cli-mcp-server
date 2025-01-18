@@ -5,9 +5,8 @@
 
 MCP server for secure command-line interactions on Windows systems, enabling controlled access to PowerShell, CMD, Git Bash shells, and remote systems via SSH. It allows MCP clients (like [Claude Desktop](https://claude.ai/download)) to perform operations on your system, similar to [Open Interpreter](https://github.com/OpenInterpreter/open-interpreter).
 
-> ⚠️ **WARNING**: This MCP server provides direct access to your system's command line interface and remote systems via SSH. When enabled, it grants access to your files, environment variables, command execution capabilities, and remote server management.
->
-> Always:
+>[!IMPORTANT]
+> This MCP server provides direct access to your system's command line interface and remote systems via SSH. When enabled, it grants access to your files, environment variables, command execution capabilities, and remote server management.
 >
 > - Review and restrict allowed paths and SSH connections
 > - Enable directory restrictions
@@ -15,8 +14,6 @@ MCP server for secure command-line interactions on Windows systems, enabling con
 > - Consider security implications
 >
 > See [Configuration](#configuration) for more details.
-
----
 
 - [Features](#features)
 - [Usage with Claude Desktop](#usage-with-claude-desktop)
