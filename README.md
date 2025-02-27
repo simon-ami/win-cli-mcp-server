@@ -30,6 +30,7 @@ MCP server for secure command-line interactions on Windows systems, enabling con
     - [SSH Configuration](#ssh-configuration)
 - [API](#api)
   - [Tools](#tools)
+  - [Resources](#resources)
 - [Security Considerations](#security-considerations)
 - [License](#license)
 
@@ -37,6 +38,7 @@ MCP server for secure command-line interactions on Windows systems, enabling con
 
 - **Multi-Shell Support**: Execute commands in PowerShell, Command Prompt (CMD), and Git Bash
 - **SSH Support**: Execute commands on remote systems via SSH
+- **Resource Exposure**: View SSH connections, current directory, and configuration as MCP resources
 - **Security Controls**:
   - Command and SSH command blocking (full paths, case variations)
   - Working directory validation
@@ -50,7 +52,7 @@ MCP server for secure command-line interactions on Windows systems, enabling con
   - Path restrictions
   - Blocked command lists
 
-See the [API](#api) section for more details on the tools the server provides to MCP clients.
+See the [API](#api) section for more details on the tools and resources the server provides to MCP clients.
 
 **Note**: The server will only allow operations within configured directories, with allowed commands, and on configured SSH connections.
 
@@ -86,6 +88,11 @@ For use with a specific config file, add the `--config` flag:
   }
 }
 ```
+
+After configuring, you can:
+- Execute commands directly using the available tools
+- View configured SSH connections and server configuration in the Resources section
+- Manage SSH connections through the provided tools
 
 ## Configuration
 
@@ -367,6 +374,57 @@ The configuration file is divided into three main sections: `security`, `shells`
     - `connectionId` (string): ID of the SSH connection to disconnect
   - Returns confirmation message
 
+- **create_ssh_connection**
+  - Create a new SSH connection
+  - Inputs:
+    - `connectionId` (string): ID for the new SSH connection
+    - `connectionConfig` (object): Connection configuration details including host, port, username, and either password or privateKeyPath
+  - Returns confirmation message
+
+- **read_ssh_connections**
+  - Read all configured SSH connections
+  - Returns a list of all SSH connections from the configuration
+
+- **update_ssh_connection**
+  - Update an existing SSH connection
+  - Inputs:
+    - `connectionId` (string): ID of the SSH connection to update
+    - `connectionConfig` (object): New connection configuration details
+  - Returns confirmation message
+
+- **delete_ssh_connection**
+  - Delete an SSH connection
+  - Input:
+    - `connectionId` (string): ID of the SSH connection to delete
+  - Returns confirmation message
+
+- **get_current_directory**
+  - Get the current working directory of the server
+  - Returns the current working directory path
+
+### Resources
+
+- **SSH Connections**
+  - URI format: `ssh://{connectionId}`
+  - Contains connection details with sensitive information masked
+  - One resource for each configured SSH connection
+  - Example: `ssh://raspberry-pi` shows configuration for the "raspberry-pi" connection
+
+- **SSH Configuration**
+  - URI: `ssh://config`
+  - Contains overall SSH configuration and all connections (with passwords masked)
+  - Shows settings like defaultTimeout, maxConcurrentSessions, and the list of connections
+
+- **Current Directory**
+  - URI: `cli://currentdir`
+  - Contains the current working directory of the CLI server
+  - Shows the path where commands will execute by default
+
+- **CLI Configuration**
+  - URI: `cli://config`
+  - Contains the CLI server configuration (excluding sensitive data)
+  - Shows security settings, shell configurations, and SSH settings
+
 ## Security Considerations
 
 - Commands are blocked based on executable names and full paths
@@ -381,6 +439,7 @@ The configuration file is divided into three main sections: `security`, `shells`
 - All inputs are validated before execution
 - Environment variables and personal files may be accessible within allowed paths
 - Consider limiting access to sensitive directories and environment information
+- Sensitive information (passwords) in resources is automatically masked
 
 ## License
 
