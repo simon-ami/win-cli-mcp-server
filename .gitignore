@@ -5,3 +5,4 @@ dist/
 *.log
 config.json
 .cursorrules
+.history

@@ -26,6 +26,7 @@
     - [SSH Configuration](#ssh-configuration)
 - [API](#api)
   - [Tools](#tools)
+  - [Resources](#resources)
 - [Security Considerations](#security-considerations)
 - [License](#license)
 
@@ -33,6 +34,7 @@
 
 - **Multi-Shell Support**: Execute commands in PowerShell, Command Prompt (CMD), and Git Bash
 - **SSH Support**: Execute commands on remote systems via SSH
+- **Resource Exposure**: View SSH connections, current directory, and configuration as MCP resources
 - **Security Controls**:
   - Command and SSH command blocking (full paths, case variations)
   - Working directory validation
@@ -46,7 +48,7 @@
   - Path restrictions
   - Blocked command lists
 
-See the [API](#api) section for more details on the tools the server provides to MCP clients.
+See the [API](#api) section for more details on the tools and resources the server provides to MCP clients.
 
 **Note**: The server will only allow operations within configured directories, with allowed commands, and on configured SSH connections.
 
@@ -82,6 +84,11 @@ For use with a specific config file, add the `--config` flag:
   }
 }
 ```
+
+After configuring, you can:
+- Execute commands directly using the available tools
+- View configured SSH connections and server configuration in the Resources section
+- Manage SSH connections through the provided tools
 
 ## Configuration
 
@@ -363,20 +370,88 @@ The configuration file is divided into three main sections: `security`, `shells`
     - `connectionId` (string): ID of the SSH connection to disconnect
   - Returns confirmation message
 
+- **create_ssh_connection**
+  - Create a new SSH connection
+  - Inputs:
+    - `connectionId` (string): ID for the new SSH connection
+    - `connectionConfig` (object): Connection configuration details including host, port, username, and either password or privateKeyPath
+  - Returns confirmation message
+
+- **read_ssh_connections**
+  - Read all configured SSH connections
+  - Returns a list of all SSH connections from the configuration
+
+- **update_ssh_connection**
+  - Update an existing SSH connection
+  - Inputs:
+    - `connectionId` (string): ID of the SSH connection to update
+    - `connectionConfig` (object): New connection configuration details
+  - Returns confirmation message
+
+- **delete_ssh_connection**
+  - Delete an SSH connection
+  - Input:
+    - `connectionId` (string): ID of the SSH connection to delete
+  - Returns confirmation message
+
+- **get_current_directory**
+  - Get the current working directory of the server
+  - Returns the current working directory path
+
+### Resources
+
+- **SSH Connections**
+  - URI format: `ssh://{connectionId}`
+  - Contains connection details with sensitive information masked
+  - One resource for each configured SSH connection
+  - Example: `ssh://raspberry-pi` shows configuration for the "raspberry-pi" connection
+
+- **SSH Configuration**
+  - URI: `ssh://config`
+  - Contains overall SSH configuration and all connections (with passwords masked)
+  - Shows settings like defaultTimeout, maxConcurrentSessions, and the list of connections
+
+- **Current Directory**
+  - URI: `cli://currentdir`
+  - Contains the current working directory of the CLI server
+  - Shows the path where commands will execute by default
+
+- **CLI Configuration**
+  - URI: `cli://config`
+  - Contains the CLI server configuration (excluding sensitive data)
+  - Shows security settings, shell configurations, and SSH settings
+
 ## Security Considerations
 
-- Commands are blocked based on executable names and full paths
-- Case-insensitive blocking: "DEL.EXE", "del.cmd", etc.
-- Smart path parsing prevents bypassing blocks with alternate paths
-- Command contents are analyzed to avoid false positives (e.g., "warm_dir" is allowed even if "rm" is blocked)
-- Potentially dangerous command arguments are blocked
-- Command injection protection can be enabled or disabled
-- Working directories are validated against allowed paths
-- Command length is limited by default
-- Shell processes are properly terminated
-- All inputs are validated before execution
-- Environment variables and personal files may be accessible within allowed paths
-- Consider limiting access to sensitive directories and environment information
+### Built-in Security Features (Always Active)
+
+The following security features are hard-coded into the server and cannot be disabled:
+
+- **Case-insensitive command blocking**: All command blocking is case-insensitive (e.g., "DEL.EXE", "del.cmd", etc. are all blocked if "del" is in blockedCommands)
+- **Smart path parsing**: The server parses full command paths to prevent bypass attempts (blocking "C:\\Windows\\System32\\rm.exe" if "rm" is blocked)
+- **Command parsing intelligence**: False positives are avoided (e.g., "warm_dir" is not blocked just because "rm" is in blockedCommands)
+- **Input validation**: All user inputs are validated before execution
+- **Shell process management**: Processes are properly terminated after execution or timeout
+- **Sensitive data masking**: Passwords are automatically masked in resources (replaced with ********)
+
+### Configurable Security Features (Active by Default)
+
+These security features are configurable through the config.json file:
+
+- **Command blocking**: Commands specified in `blockedCommands` array are blocked (default includes dangerous commands like rm, del, format)
+- **Argument blocking**: Arguments specified in `blockedArguments` array are blocked (default includes potentially dangerous flags)
+- **Command injection protection**: Prevents command chaining (enabled by default through `enableInjectionProtection: true`)
+- **Working directory restriction**: Limits command execution to specified directories (enabled by default through `restrictWorkingDirectory: true`)
+- **Command length limit**: Restricts maximum command length (default: 2000 characters)
+- **Command timeout**: Terminates commands that run too long (default: 30 seconds)
+- **Command logging**: Records command history (enabled by default through `logCommands: true`)
+
+### Important Security Warnings
+
+These are not features but important security considerations to be aware of:
+
+- **Environment access**: Commands may have access to environment variables, which could contain sensitive information
+- **File system access**: Commands can read/write files within allowed paths - carefully configure `allowedPaths` to prevent access to sensitive data
 
 ## License
 
