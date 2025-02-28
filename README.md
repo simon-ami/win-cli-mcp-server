@@ -427,19 +427,35 @@ The configuration file is divided into three main sections: `security`, `shells`
 
 ## Security Considerations
 
-- Commands are blocked based on executable names and full paths
-- Case-insensitive blocking: "DEL.EXE", "del.cmd", etc.
-- Smart path parsing prevents bypassing blocks with alternate paths
-- Command contents are analyzed to avoid false positives (e.g., "warm_dir" is allowed even if "rm" is blocked)
-- Potentially dangerous command arguments are blocked
-- Command injection protection can be enabled or disabled
-- Working directories are validated against allowed paths
-- Command length is limited by default
-- Shell processes are properly terminated
-- All inputs are validated before execution
-- Environment variables and personal files may be accessible within allowed paths
-- Consider limiting access to sensitive directories and environment information
-- Sensitive information (passwords) in resources is automatically masked
+### Built-in Security Features (Always Active)
+
+The following security features are hard-coded into the server and cannot be disabled:
+
+- **Case-insensitive command blocking**: All command blocking is case-insensitive (e.g., "DEL.EXE", "del.cmd", etc. are all blocked if "del" is in blockedCommands)
+- **Smart path parsing**: The server parses full command paths to prevent bypass attempts (blocking "C:\\Windows\\System32\\rm.exe" if "rm" is blocked)
+- **Command parsing intelligence**: False positives are avoided (e.g., "warm_dir" is not blocked just because "rm" is in blockedCommands)
+- **Input validation**: All user inputs are validated before execution
+- **Shell process management**: Processes are properly terminated after execution or timeout
+- **Sensitive data masking**: Passwords are automatically masked in resources (replaced with ********)
+
+### Configurable Security Features (Active by Default)
+
+These security features are configurable through the config.json file:
+
+- **Command blocking**: Commands specified in `blockedCommands` array are blocked (default includes dangerous commands like rm, del, format)
+- **Argument blocking**: Arguments specified in `blockedArguments` array are blocked (default includes potentially dangerous flags)
+- **Command injection protection**: Prevents command chaining (enabled by default through `enableInjectionProtection: true`)
+- **Working directory restriction**: Limits command execution to specified directories (enabled by default through `restrictWorkingDirectory: true`)
+- **Command length limit**: Restricts maximum command length (default: 2000 characters)
+- **Command timeout**: Terminates commands that run too long (default: 30 seconds)
+- **Command logging**: Records command history (enabled by default through `logCommands: true`)
+
+### Important Security Warnings
+
+These are not features but important security considerations to be aware of:
+
+- **Environment access**: Commands may have access to environment variables, which could contain sensitive information
+- **File system access**: Commands can read/write files within allowed paths - carefully configure `allowedPaths` to prevent access to sensitive data
 
 ## License
 
