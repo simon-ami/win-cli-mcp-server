@@ -20,10 +20,9 @@ import { spawn } from 'child_process';
 import { z } from 'zod';
 import path from 'path';
 import { loadConfig, createDefaultConfig } from './utils/config.js';
-import type { ServerConfig, CommandHistoryEntry, SSHConnectionConfig } from './types/config.js';
-import { SSHConnectionPool } from './utils/ssh.js';
+import type { ServerConfig, CommandHistoryEntry } from './types/config.js';
 import { createRequire } from 'module';
-import { createSSHConnection, readSSHConnections, updateSSHConnection, deleteSSHConnection } from './utils/sshManager.js';
+
 const require = createRequire(import.meta.url);
 const packageJson = require('../package.json');
 
@@ -52,7 +51,6 @@ class CLIServer {
   private blockedCommands: Set<string>;
   private commandHistory: CommandHistoryEntry[];
   private config: ServerConfig;
-  private sshPool: SSHConnectionPool;
 
   constructor(config: ServerConfig) {
     this.config = config;
@@ -70,7 +68,6 @@ class CLIServer {
     this.allowedPaths = new Set(config.security.allowedPaths);
     this.blockedCommands = new Set(config.security.blockedCommands);
     this.commandHistory = [];
-    this.sshPool = new SSHConnectionPool();
 
     this.setupHandlers();
   }
@@ -124,15 +121,7 @@ class CLIServer {
   private setupHandlers(): void {
     // List available resources
     this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
-      const sshConnections = readSSHConnections() as Record<string, any>;
-      
-      // Create resources for each SSH connection
-      const resources = Object.entries(sshConnections).map(([id, config]) => ({
-        uri: `ssh://${id}`,
-        name: `SSH Connection: ${id}`,
-        description: `SSH connection to ${config.host}:${config.port} as ${config.username}`,
-        mimeType: "application/json"
-      }));
+      const resources: Array<{uri:string,name:string,description:string,mimeType:string}> = [];
       
       // Add a resource for the current working directory
       resources.push({
@@ -142,14 +131,6 @@ class CLIServer {
         mimeType: "text/plain"
       });
       
-      // Add a resource for SSH configuration
-      resources.push({
-        uri: "ssh://config",
-        name: "SSH Configuration",
-        description: "All SSH connection configurations",
-        mimeType: "application/json"
-      });
-
       // Add a resource for CLI configuration
       resources.push({
         uri: "cli://config",
@@ -157,69 +138,13 @@ class CLIServer {
         description: "Main CLI server configuration (excluding sensitive data)",
         mimeType: "application/json"
       });
-      
+
       return { resources };
     });
 
     // Read resource content
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const uri = request.params.uri;
-      
-      // Handle SSH connection resources
-      if (uri.startsWith("ssh://") && uri !== "ssh://config") {
-        const connectionId = uri.slice(6); // Remove "ssh://" prefix
-        const connections = readSSHConnections() as Record<string, any>;
-        const connectionConfig = connections[connectionId];
-        
-        if (!connectionConfig) {
-          throw new McpError(
-            ErrorCode.InvalidRequest,
-            `Unknown SSH connection: ${connectionId}`
-          );
-        }
-        
-        // Return connection details (excluding sensitive info)
-        const safeConfig = { ...connectionConfig };
-        
-        // Remove sensitive information
-        if (safeConfig.password) {
-          safeConfig.password = "********";
-        }
-        
-        return {
-          contents: [{
-            uri,
-            mimeType: "application/json",
-            text: JSON.stringify(safeConfig, null, 2)
-          }]
-        };
-      }
-      
-      // Handle SSH configuration resource
-      if (uri === "ssh://config") {
-        const connections = readSSHConnections() as Record<string, any>;
-        const safeConnections = { ...connections };
-        
-        // Remove sensitive information from all connections
-        for (const connection of Object.values(safeConnections)) {
-          if (connection.password) {
-            connection.password = "********";
-          }
-        }
-        
-        return {
-          contents: [{
-            uri,
-            mimeType: "application/json",
-            text: JSON.stringify({
-              enabled: this.config.ssh.enabled,
-              defaultTimeout: this.config.ssh.defaultTimeout,
-              maxConcurrentSessions: this.config.ssh.maxConcurrentSessions,
-              connections: safeConnections
-            }, null, 2)
-          }]
-        };
-      }
       
       // Handle current directory resource
       if (uri === "cli://currentdir") {
@@ -242,12 +167,6 @@ class CLIServer {
           },
           shells: {
             ...this.config.shells
-          },
-          ssh: {
-            enabled: this.config.ssh.enabled,
-            defaultTimeout: this.config.ssh.defaultTimeout,
-            maxConcurrentSessions: this.config.ssh.maxConcurrentSessions,
-            connections: Object.keys(this.config.ssh.connections).length
           }
         };
         
@@ -351,174 +270,6 @@ Example response:
                 description: `Maximum number of history entries to return (default: 10, max: ${this.config.security.maxHistorySize})`
               }
             }
-          }
-        },
-        {
-          name: "ssh_execute",
-          description: `Execute a command on a remote host via SSH
-
-Example usage:
-\`\`\`json
-{
-  "connectionId": "raspberry-pi",
-  "command": "uname -a"
-}
-\`\`\`
-
-Configuration required in config.json:
-\`\`\`json
-{
-  "ssh": {
-    "enabled": true,
-    "connections": {
-      "raspberry-pi": {
-        "host": "raspberrypi.local",
-        "port": 22,
-        "username": "pi",
-        "password": "raspberry"
-      }
-    }
-  }
-}
-\`\`\``,
-          inputSchema: {
-            type: "object",
-            properties: {
-              connectionId: {
-                type: "string",
-                description: "ID of the SSH connection to use",
-                enum: Object.keys(this.config.ssh.connections)
-              },
-              command: {
-                type: "string",
-                description: "Command to execute"
-              }
-            },
-            required: ["connectionId", "command"]
-          }
-        },
-        {
-          name: "ssh_disconnect",
-          description: `Disconnect from an SSH server
-
-Example usage:
-\`\`\`json
-{
-  "connectionId": "raspberry-pi"
-}
-\`\`\`
-
-Use this to cleanly close SSH connections when they're no longer needed.`,
-          inputSchema: {
-            type: "object",
-            properties: {
-              connectionId: {
-                type: "string",
-                description: "ID of the SSH connection to disconnect",
-                enum: Object.keys(this.config.ssh.connections)
-              }
-            },
-            required: ["connectionId"]
-          }
-        },
-        {
-          name: "create_ssh_connection",
-          description: "Create a new SSH connection",
-          inputSchema: {
-            type: "object",
-            properties: {
-              connectionId: {
-                type: "string",
-                description: "ID of the SSH connection"
-              },
-              connectionConfig: {
-                type: "object",
-                properties: {
-                  host: {
-                    type: "string",
-                    description: "Host of the SSH connection"
-                  },
-                  port: {
-                    type: "number",
-                    description: "Port of the SSH connection"
-                  },
-                  username: {
-                    type: "string",
-                    description: "Username for the SSH connection"
-                  },
-                  password: {
-                    type: "string",
-                    description: "Password for the SSH connection"
-                  },
-                  privateKeyPath: {
-                    type: "string",
-                    description: "Path to the private key for the SSH connection"
-                  }
-                },
-                required: ["connectionId", "connectionConfig"]
-              }
-            }
-          }
-        },
-        {
-          name: "read_ssh_connections",
-          description: "Read all SSH connections",
-          inputSchema: {
-            type: "object",
-            properties: {} // No input parameters needed
-          }
-        },
-        {
-          name: "update_ssh_connection",
-          description: "Update an existing SSH connection",
-          inputSchema: {
-            type: "object",
-            properties: {
-              connectionId: {
-                type: "string",
-                description: "ID of the SSH connection to update"
-              },
-              connectionConfig: {
-                type: "object",
-                properties: {
-                  host: {
-                    type: "string",
-                    description: "Host of the SSH connection"
-                  },
-                  port: {
-                    type: "number",
-                    description: "Port of the SSH connection"
-                  },
-                  username: {
-                    type: "string",
-                    description: "Username for the SSH connection"
-                  },
-                  password: {
-                    type: "string",
-                    description: "Password for the SSH connection"
-                  },
-                  privateKeyPath: {
-                    type: "string",
-                    description: "Path to the private key for the SSH connection"
-                  }
-                },
-                required: ["connectionId", "connectionConfig"]
-              }
-            }
-          }
-        },
-        {
-          name: "delete_ssh_connection",
-          description: "Delete an existing SSH connection",
-          inputSchema: {
-            type: "object",
-            properties: {
-              connectionId: {
-                type: "string",
-                description: "ID of the SSH connection to delete"
-              }
-            },
-            required: ["connectionId"]
           }
         },
         {
@@ -724,142 +475,6 @@ Use this to cleanly close SSH connections when they're no longer needed.`,
             };
           }
 
-          case "ssh_execute": {
-            if (!this.config.ssh.enabled) {
-              throw new McpError(
-                ErrorCode.InvalidRequest,
-                "SSH support is disabled in configuration"
-              );
-            }
-
-            const args = z.object({
-              connectionId: z.string(),
-              command: z.string()
-            }).parse(request.params.arguments);
-
-            const connectionConfig = this.config.ssh.connections[args.connectionId];
-            if (!connectionConfig) {
-              throw new McpError(
-                ErrorCode.InvalidRequest,
-                `Unknown SSH connection ID: ${args.connectionId}`
-              );
-            }
-
-            try {
-              // Validate command
-              this.validateCommand('cmd', args.command);
-
-              const connection = await this.sshPool.getConnection(args.connectionId, connectionConfig);
-              const { output, exitCode } = await connection.executeCommand(args.command);
-
-              // Store in history if enabled
-              if (this.config.security.logCommands) {
-                this.commandHistory.push({
-                  command: args.command,
-                  output,
-                  timestamp: new Date().toISOString(),
-                  exitCode,
-                  connectionId: args.connectionId
-                });
-
-                if (this.commandHistory.length > this.config.security.maxHistorySize) {
-                  this.commandHistory = this.commandHistory.slice(-this.config.security.maxHistorySize);
-                }
-              }
-
-              return {
-                content: [{
-                  type: "text",
-                  text: output || 'Command completed successfully (no output)'
-                }],
-                isError: exitCode !== 0,
-                metadata: {
-                  exitCode,
-                  connectionId: args.connectionId
-                }
-              };
-            } catch (error) {
-              const errorMessage = error instanceof Error ? error.message : String(error);
-              if (this.config.security.logCommands) {
-                this.commandHistory.push({
-                  command: args.command,
-                  output: `SSH error: ${errorMessage}`,
-                  timestamp: new Date().toISOString(),
-                  exitCode: -1,
-                  connectionId: args.connectionId
-                });
-              }
-              throw new McpError(
-                ErrorCode.InternalError,
-                `SSH error: ${errorMessage}`
-              );
-            }
-          }
-
-          case "ssh_disconnect": {
-            if (!this.config.ssh.enabled) {
-              throw new McpError(
-                ErrorCode.InvalidRequest,
-                "SSH support is disabled in configuration"
-              );
-            }
-
-            const args = z.object({
-              connectionId: z.string()
-            }).parse(request.params.arguments);
-
-            await this.sshPool.closeConnection(args.connectionId);
-            return {
-              content: [{
-                type: "text",
-                text: `Disconnected from ${args.connectionId}`
-              }]
-            };
-          }
-
-          case 'create_ssh_connection': {
-            const args = z.object({
-              connectionId: z.string(),
-              connectionConfig: z.object({
-                host: z.string(),
-                port: z.number(),
-                username: z.string(),
-                password: z.string().optional(),
-                privateKeyPath: z.string().optional(),
-              })
-            }).parse(request.params.arguments);
-            createSSHConnection(args.connectionId, args.connectionConfig);
-            return { content: [{ type: 'text', text: 'SSH connection created successfully.' }] };
-          }
-
-          case 'read_ssh_connections': {
-            const connections = readSSHConnections();
-            return { content: [{ type: 'json', text: JSON.stringify(connections, null, 2) }] };
-          }
-
-          case 'update_ssh_connection': {
-            const args = z.object({
-              connectionId: z.string(),
-              connectionConfig: z.object({
-                host: z.string(),
-                port: z.number(),
-                username: z.string(),
-                password: z.string().optional(),
-                privateKeyPath: z.string().optional(),
-              })
-            }).parse(request.params.arguments);
-            updateSSHConnection(args.connectionId, args.connectionConfig);
-            return { content: [{ type: 'text', text: 'SSH connection updated successfully.' }] };
-          }
-
-          case 'delete_ssh_connection': {
-            const args = z.object({
-              connectionId: z.string(),
-            }).parse(request.params.arguments);
-            deleteSSHConnection(args.connectionId);
-            return { content: [{ type: 'text', text: 'SSH connection deleted successfully.' }] };
-          }
-
           case 'get_current_directory': {
             const currentDir = process.cwd();
             return { content: [{ type: 'text', text: `Current working directory: ${currentDir}` }] };
@@ -867,24 +482,23 @@ Use this to cleanly close SSH connections when they're no longer needed.`,
 
           default:
             throw new McpError(
-              ErrorCode.MethodNotFound,
+              ErrorCode.InvalidRequest,
               `Unknown tool: ${request.params.name}`
             );
         }
-      } catch (error) {
-        if (error instanceof z.ZodError) {
+      } catch (err) {
+        if (err instanceof z.ZodError) {
           throw new McpError(
             ErrorCode.InvalidParams,
-            `Invalid arguments: ${error.errors.map(e => e.message).join(', ')}`
+            `Invalid arguments: ${err.errors.map(e => e.message).join(', ')}`
           );
         }
-        throw error;
+        throw err;
       }
     });
   }
 
   private async cleanup(): Promise<void> {
-    this.sshPool.closeAll();
   }
 
   async run(): Promise<void> {
