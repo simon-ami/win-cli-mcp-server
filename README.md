@@ -95,13 +95,13 @@ The server uses a JSON configuration file to customize its behavior. You can spe
 
 1. To create a default config file, either:
 
-  **a)** copy `config.sample.json` to `config.json` (or the location specified by `--config`), or
+    **a)** copy `config.sample.json` to `config.json` (or the location specified by `--config`), or
 
-  **b)** run:
+    **b)** run:
 
-  ```bash
-  npx @simonb97/server-win-cli --init-config ./config.json
-  ```
+    ```bash
+    npx @simonb97/server-win-cli --init-config ./config.json
+    ```
 
 2. Then set the `--config` flag to point to your config file as described in the [Usage with Claude Desktop](#usage-with-claude-desktop) section.
 
