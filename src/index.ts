@@ -20,7 +20,7 @@ import { spawn } from 'child_process';
 import { z } from 'zod';
 import path from 'path';
 import { loadConfig, createDefaultConfig } from './utils/config.js';
-import type { ServerConfig, CommandHistoryEntry } from './types/config.js';
+import type { ServerConfig } from './types/config.js';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -49,7 +49,6 @@ class CLIServer {
   private server: Server;
   private allowedPaths: Set<string>;
   private blockedCommands: Set<string>;
-  private commandHistory: CommandHistoryEntry[];
   private config: ServerConfig;
 
   constructor(config: ServerConfig) {
@@ -67,7 +66,6 @@ class CLIServer {
     // Initialize from config
     this.allowedPaths = new Set(config.security.allowedPaths);
     this.blockedCommands = new Set(config.security.blockedCommands);
-    this.commandHistory = [];
 
     this.setupHandlers();
   }
@@ -241,38 +239,6 @@ Example usage (Git Bash):
           }
         },
         {
-          name: "get_command_history",
-          description: `Get the history of executed commands
-
-Example usage:
-\`\`\`json
-{
-  "limit": 5
-}
-\`\`\`
-
-Example response:
-\`\`\`json
-[
-  {
-    "command": "Get-Process",
-    "output": "...",
-    "timestamp": "2024-03-20T10:30:00Z",
-    "exitCode": 0
-  }
-]
-\`\`\``,
-          inputSchema: {
-            type: "object",
-            properties: {
-              limit: {
-                type: "number",
-                description: `Maximum number of history entries to return (default: 10, max: ${this.config.security.maxHistorySize})`
-              }
-            }
-          }
-        },
-        {
           name: "get_current_directory",
           description: "Get the current working directory",
           inputSchema: {
@@ -374,21 +340,6 @@ Example response:
                   }
                 }
 
-                // Store in history if enabled
-                if (this.config.security.logCommands) {
-                  this.commandHistory.push({
-                    command: args.command,
-                    output: resultMessage,
-                    timestamp: new Date().toISOString(),
-                    exitCode: code ?? -1
-                  });
-
-                  // Trim history if needed
-                  if (this.commandHistory.length > this.config.security.maxHistorySize) {
-                    this.commandHistory = this.commandHistory.slice(-this.config.security.maxHistorySize);
-                  }
-                }
-
                 resolve({
                   content: [{
                     type: "text",
@@ -406,14 +357,6 @@ Example response:
               // Handle process errors (e.g., shell crashes)
               shellProcess.on('error', (err) => {
                 const errorMessage = `Shell process error: ${err.message}`;
-                if (this.config.security.logCommands) {
-                  this.commandHistory.push({
-                    command: args.command,
-                    output: errorMessage,
-                    timestamp: new Date().toISOString(),
-                    exitCode: -1
-                  });
-                }
                 reject(new McpError(
                   ErrorCode.InternalError,
                   errorMessage
@@ -424,14 +367,6 @@ Example response:
               const timeout = setTimeout(() => {
                 shellProcess.kill();
                 const timeoutMessage = `Command execution timed out after ${this.config.security.commandTimeout} seconds. Consult the server admin for configuration changes (config.json - commandTimeout).`;
-                if (this.config.security.logCommands) {
-                  this.commandHistory.push({
-                    command: args.command,
-                    output: timeoutMessage,
-                    timestamp: new Date().toISOString(),
-                    exitCode: -1
-                  });
-                }
                 reject(new McpError(
                   ErrorCode.InternalError,
                   timeoutMessage
@@ -440,39 +375,6 @@ Example response:
 
               shellProcess.on('close', () => clearTimeout(timeout));
             });
-          }
-
-          case "get_command_history": {
-            if (!this.config.security.logCommands) {
-              return {
-                content: [{
-                  type: "text",
-                  text: "Command history is disabled in configuration. Consult the server admin for configuration changes (config.json - logCommands)."
-                }]
-              };
-            }
-
-            const args = z.object({
-              limit: z.number()
-                .min(1)
-                .max(this.config.security.maxHistorySize)
-                .optional()
-                .default(10)
-            }).parse(request.params.arguments);
-
-            const history = this.commandHistory
-              .slice(-args.limit)
-              .map(entry => ({
-                ...entry,
-                output: entry.output.slice(0, 1000) // Limit output size
-              }));
-
-            return {
-              content: [{
-                type: "text",
-                text: JSON.stringify(history, null, 2)
-              }]
-            };
           }
 
           case 'get_current_directory': {

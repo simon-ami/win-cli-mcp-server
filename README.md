@@ -289,12 +289,6 @@ The configuration file is divided into two main sections: `security` and `shells
     - `workingDir` (optional string): Working directory
   - Returns command output as text, or error message if execution fails
 
-- **get_command_history**
-
-  - Get the history of executed commands
-  - Input: `limit` (optional number)
-  - Returns timestamped command history with outputs
-
 - **get_current_directory**
   - Get the current working directory of the server
   - Returns the current working directory path

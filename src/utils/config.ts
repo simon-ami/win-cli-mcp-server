@@ -24,8 +24,6 @@ export const DEFAULT_CONFIG: ServerConfig = {
       process.cwd()
     ],
     restrictWorkingDirectory: true,
-    logCommands: true,
-    maxHistorySize: 1000,
     commandTimeout: 30,
     enableInjectionProtection: true
   },
@@ -140,10 +138,6 @@ function validateConfig(config: ServerConfig): void {
   // Validate security settings
   if (config.security.maxCommandLength < 1) {
     throw new Error('maxCommandLength must be positive');
-  }
-
-  if (config.security.maxHistorySize < 1) {
-    throw new Error('maxHistorySize must be positive');
   }
 
   // Validate shell configurations

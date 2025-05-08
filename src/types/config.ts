@@ -4,8 +4,6 @@ export interface SecurityConfig {
   blockedArguments: string[];
   allowedPaths: string[];
   restrictWorkingDirectory: boolean;
-  logCommands: boolean;
-  maxHistorySize: number;
   commandTimeout: number;
   enableInjectionProtection: boolean;
 }
@@ -47,12 +45,4 @@ export interface ServerConfig {
     gitbash: ShellConfig;
   };
   ssh: SSHConfig;
-}
-
-export interface CommandHistoryEntry {
-  command: string;
-  output: string;
-  timestamp: string;
-  exitCode: number;
-  connectionId?: string;
 }
