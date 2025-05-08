@@ -241,38 +241,6 @@ Example usage (Git Bash):
           }
         },
         {
-          name: "get_command_history",
-          description: `Get the history of executed commands
-
-Example usage:
-\`\`\`json
-{
-  "limit": 5
-}
-\`\`\`
-
-Example response:
-\`\`\`json
-[
-  {
-    "command": "Get-Process",
-    "output": "...",
-    "timestamp": "2024-03-20T10:30:00Z",
-    "exitCode": 0
-  }
-]
-\`\`\``,
-          inputSchema: {
-            type: "object",
-            properties: {
-              limit: {
-                type: "number",
-                description: `Maximum number of history entries to return (default: 10, max: ${this.config.security.maxHistorySize})`
-              }
-            }
-          }
-        },
-        {
           name: "get_current_directory",
           description: "Get the current working directory",
           inputSchema: {
@@ -440,39 +408,6 @@ Example response:
 
               shellProcess.on('close', () => clearTimeout(timeout));
             });
-          }
-
-          case "get_command_history": {
-            if (!this.config.security.logCommands) {
-              return {
-                content: [{
-                  type: "text",
-                  text: "Command history is disabled in configuration. Consult the server admin for configuration changes (config.json - logCommands)."
-                }]
-              };
-            }
-
-            const args = z.object({
-              limit: z.number()
-                .min(1)
-                .max(this.config.security.maxHistorySize)
-                .optional()
-                .default(10)
-            }).parse(request.params.arguments);
-
-            const history = this.commandHistory
-              .slice(-args.limit)
-              .map(entry => ({
-                ...entry,
-                output: entry.output.slice(0, 1000) // Limit output size
-              }));
-
-            return {
-              content: [{
-                type: "text",
-                text: JSON.stringify(history, null, 2)
-              }]
-            };
           }
 
           case 'get_current_directory': {
