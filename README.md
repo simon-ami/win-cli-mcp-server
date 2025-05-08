@@ -29,6 +29,7 @@ It allows MCP clients (like [Claude Desktop](https://claude.ai/download)) to per
   - [Tools](#tools)
   - [Resources](#resources)
 - [Security Considerations](#security-considerations)
+- [Using the MCP Inspector for Testing](#using-the-mcp-inspector-for-testing)
 - [License](#license)
 
 ## Features
@@ -316,6 +317,15 @@ This server allows external tools to execute commands on your system. Exercise e
 - **Restrictive Blocklists**: Block any potentially harmful commands or arguments.
 - **Regularly Review Logs**: Check the command history for suspicious activity.
 - **Keep Software Updated**: Ensure Node.js, npm, and the server itself are up-to-date.
+
+## Using the MCP Inspector for Testing
+
+Use the Inspector to interactively test this server with a custom config file. Pass any server flags after `--`:
+
+```bash
+# Inspect with built server and test config
+npx @modelcontextprotocol/inspector -- node dist/index.js --config tests/config.json
+```
 
 ## License
 
