@@ -20,7 +20,7 @@ import { spawn } from 'child_process';
 import { z } from 'zod';
 import path from 'path';
 import { loadConfig, createDefaultConfig } from './utils/config.js';
-import type { ServerConfig, CommandHistoryEntry } from './types/config.js';
+import type { ServerConfig } from './types/config.js';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -49,7 +49,6 @@ class CLIServer {
   private server: Server;
   private allowedPaths: Set<string>;
   private blockedCommands: Set<string>;
-  private commandHistory: CommandHistoryEntry[];
   private config: ServerConfig;
 
   constructor(config: ServerConfig) {
@@ -67,7 +66,6 @@ class CLIServer {
     // Initialize from config
     this.allowedPaths = new Set(config.security.allowedPaths);
     this.blockedCommands = new Set(config.security.blockedCommands);
-    this.commandHistory = [];
 
     this.setupHandlers();
   }
@@ -342,21 +340,6 @@ Example usage (Git Bash):
                   }
                 }
 
-                // Store in history if enabled
-                if (this.config.security.logCommands) {
-                  this.commandHistory.push({
-                    command: args.command,
-                    output: resultMessage,
-                    timestamp: new Date().toISOString(),
-                    exitCode: code ?? -1
-                  });
-
-                  // Trim history if needed
-                  if (this.commandHistory.length > this.config.security.maxHistorySize) {
-                    this.commandHistory = this.commandHistory.slice(-this.config.security.maxHistorySize);
-                  }
-                }
-
                 resolve({
                   content: [{
                     type: "text",
@@ -374,14 +357,6 @@ Example usage (Git Bash):
               // Handle process errors (e.g., shell crashes)
               shellProcess.on('error', (err) => {
                 const errorMessage = `Shell process error: ${err.message}`;
-                if (this.config.security.logCommands) {
-                  this.commandHistory.push({
-                    command: args.command,
-                    output: errorMessage,
-                    timestamp: new Date().toISOString(),
-                    exitCode: -1
-                  });
-                }
                 reject(new McpError(
                   ErrorCode.InternalError,
                   errorMessage
@@ -392,14 +367,6 @@ Example usage (Git Bash):
               const timeout = setTimeout(() => {
                 shellProcess.kill();
                 const timeoutMessage = `Command execution timed out after ${this.config.security.commandTimeout} seconds. Consult the server admin for configuration changes (config.json - commandTimeout).`;
-                if (this.config.security.logCommands) {
-                  this.commandHistory.push({
-                    command: args.command,
-                    output: timeoutMessage,
-                    timestamp: new Date().toISOString(),
-                    exitCode: -1
-                  });
-                }
                 reject(new McpError(
                   ErrorCode.InternalError,
                   timeoutMessage
