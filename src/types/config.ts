@@ -16,27 +16,6 @@ export interface ShellConfig {
   blockedOperators?: string[]; // Added for shell-specific operator restrictions
 }
 
-export interface SSHConnectionConfig {
-  host: string;
-  port: number;
-  username: string;
-  privateKeyPath?: string;
-  password?: string;
-  keepaliveInterval?: number;
-  keepaliveCountMax?: number;
-  readyTimeout?: number;
-}
-
-export interface SSHConfig {
-  enabled: boolean;
-  connections: Record<string, SSHConnectionConfig>;
-  defaultTimeout: number;
-  maxConcurrentSessions: number;
-  keepaliveInterval: number;
-  keepaliveCountMax: number;
-  readyTimeout: number;
-}
-
 export interface ServerConfig {
   security: SecurityConfig;
   shells: {
@@ -44,5 +23,4 @@ export interface ServerConfig {
     cmd: ShellConfig;
     gitbash: ShellConfig;
   };
-  ssh: SSHConfig;
 }

@@ -42,30 +42,5 @@
       "args": ["-c"],
       "blockedOperators": ["&", "|", ";", "`"]
     }
-  },
-  "ssh": {
-    "enabled": false,
-    "defaultTimeout": 30,
-    "maxConcurrentSessions": 5,
-    "keepaliveInterval": 10000,
-    "readyTimeout": 20000,
-    "connections": {
-      "raspberry-pi": {
-        "host": "raspberrypi.local",
-        "port": 22,
-        "username": "pi",
-        "password": "raspberry",
-        "keepaliveInterval": 10000,
-        "readyTimeout": 20000
-      },
-      "dev-server": {
-        "host": "dev.example.com",
-        "port": 22,
-        "username": "admin",
-        "privateKeyPath": "C:\\Users\\YourUsername\\.ssh\\id_rsa",
-        "keepaliveInterval": 10000,
-        "readyTimeout": 20000
-      }
-    }
   }
 }
