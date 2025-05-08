@@ -144,10 +144,20 @@ export function parseCommand(fullCommand: string): { command: string; args: stri
 }
 
 export function isPathAllowed(testPath: string, allowedPaths: string[]): boolean {
-    const normalizedPath = path.normalize(testPath).toLowerCase();
+    // Ensure consistent path format without trailing slash
+    const normalizedPath = path.normalize(testPath)
+        .toLowerCase()
+        .replace(/\\$/, ''); // Remove trailing backslash if present
+    
     return allowedPaths.some(allowedPath => {
-        const normalizedAllowedPath = path.normalize(allowedPath).toLowerCase();
-        return normalizedPath.startsWith(normalizedAllowedPath);
+        // Ensure consistent path format without trailing slash for allowed paths too
+        const normalizedAllowedPath = path.normalize(allowedPath)
+            .toLowerCase()
+            .replace(/\\$/, ''); // Remove trailing backslash if present
+            
+        // Check if test path starts with allowed path
+        return normalizedPath === normalizedAllowedPath || 
+               normalizedPath.startsWith(normalizedAllowedPath + path.sep);
     });
 }
 
