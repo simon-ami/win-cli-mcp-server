@@ -136,7 +136,7 @@ describe('Path Normalization', () => {
 
 describe('Allowed Paths Normalization', () => {
   test('removes duplicates and normalizes paths', () => {
-    const paths = ['C:/Test', 'c:\\test', '/c/Test'];
+    const paths = ['C:/Test', 'c:\\test', '/c/Test', 'C:\\test\\'];
     expect(normalizeAllowedPaths(paths)).toEqual(['c:\\test']);
   });
   test('removes nested subpaths', () => {
@@ -154,15 +154,41 @@ describe('Path Validation', () => {
   const allowedPaths = [
     'C:\\Users\\test',
     'D:\\Projects',
-    'C:\\Users\\Projects'
+    'C:\\Users\\Projects\\'
   ];
 
   test('isPathAllowed validates paths correctly', () => {
-    expect(isPathAllowed(normalizeWindowsPath('C:\\Users\\test\\docs'), allowedPaths)).toBe(true);
     expect(isPathAllowed(normalizeWindowsPath('C:\\Users\\test'), allowedPaths)).toBe(true);
-    expect(isPathAllowed(normalizeWindowsPath('/c/Users/Projects'), allowedPaths)).toBe(true);
+    expect(isPathAllowed(normalizeWindowsPath('C:\\Users\\test\\docs'), allowedPaths)).toBe(true);
     expect(isPathAllowed(normalizeWindowsPath('D:\\Projects\\code'), allowedPaths)).toBe(true);
+    expect(isPathAllowed(normalizeWindowsPath('/c/Users/Projects'), allowedPaths)).toBe(true);
     expect(isPathAllowed(normalizeWindowsPath('E:\\NotAllowed'), allowedPaths)).toBe(false);
+    expect(isPathAllowed(normalizeWindowsPath('C:\\Users\\Projects'), allowedPaths)).toBe(true);
+  });
+  
+  test('isPathAllowed handles trailing slashes correctly', () => {
+    // Test when allowedPath has trailing slash and input doesn't
+    // 'C:\Users\Projects\' is in allowedPaths with trailing slash
+    expect(isPathAllowed(normalizeWindowsPath('C:\\Users\\Projects'), allowedPaths)).toBe(true);
+    expect(isPathAllowed(normalizeWindowsPath('/c/Users/Projects'), allowedPaths)).toBe(true);
+    
+    // Test when allowedPath doesn't have trailing slash and input does
+    // 'D:\Projects' is in allowedPaths without trailing slash
+    expect(isPathAllowed(normalizeWindowsPath('D:\\Projects\\'), allowedPaths)).toBe(true);
+    expect(isPathAllowed(normalizeWindowsPath('/d/Projects/'), allowedPaths)).toBe(true);
+    
+    // Test when user path has trailing slash and allowed path doesn't
+    // 'C:\Users\test' is in allowedPaths without trailing slash
+    expect(isPathAllowed(normalizeWindowsPath('C:\\Users\\test\\'), allowedPaths)).toBe(true);
+    expect(isPathAllowed(normalizeWindowsPath('/c/Users/test/'), allowedPaths)).toBe(true);
+    
+    // Test with subdirectories when allowedPath has trailing slash
+    expect(isPathAllowed(normalizeWindowsPath('C:\\Users\\Projects\\subdir'), allowedPaths)).toBe(true);
+    expect(isPathAllowed(normalizeWindowsPath('/c/Users/Projects/subdir'), allowedPaths)).toBe(true);
+    
+    // Test with subdirectories when allowedPath doesn't have trailing slash
+    expect(isPathAllowed(normalizeWindowsPath('D:\\Projects\\subdir'), allowedPaths)).toBe(true);
+    expect(isPathAllowed(normalizeWindowsPath('/d/Projects/subdir'), allowedPaths)).toBe(true);
   });
 
   test('isPathAllowed is case insensitive', () => {
