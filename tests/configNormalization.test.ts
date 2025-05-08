@@ -4,7 +4,7 @@ import os from 'os';
 import { randomBytes } from 'crypto';
 import { loadConfig } from '../src/utils/config.js';
 
-describe('Config allowedPaths normalization', () => {
+describe('Validate allowedPaths normalization from config', () => {
   let tempDir: string;
   let CONFIG_PATH: string;
 
@@ -14,8 +14,9 @@ describe('Config allowedPaths normalization', () => {
     const content = {
       security: { allowedPaths: [
         'C:\\SomeFolder\\Test',
-        'c:/other/PATH',
-        '/c/other/PATH'
+        '/c/other/PATH',
+        'C:/Another/Folder',
+        '/mnt/d/Incorrect/Path'
       ] }
     };
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(content));
@@ -29,8 +30,10 @@ describe('Config allowedPaths normalization', () => {
     const cfg = loadConfig(CONFIG_PATH);
     const normalized = cfg.security.allowedPaths;
     expect(normalized).toEqual([
-      path.normalize('C:\\SomeFolder\\Test').toLowerCase(),
-      path.normalize('c:/other/PATH').toLowerCase()
+      path.normalize('c:\\somefolder\\test'),
+      path.normalize('c:\\other\\path'),
+      path.normalize('c:\\another\\folder'),
+      path.normalize('c:\\mnt\\d\\incorrect\\path')
     ]);
   });
 });
