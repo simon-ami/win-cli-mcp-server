@@ -1,17 +1,5 @@
 import path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import type { ShellConfig } from '../types/config.js';
-const execAsync = promisify(exec);
-
-export async function resolveCommandPath(command: string): Promise<string | null> {
-    try {
-        const { stdout } = await execAsync(`where "${command}"`, { encoding: 'utf8' });
-        return stdout.split('\n')[0].trim();
-    } catch {
-        return null;
-    }
-}
 
 export function extractCommandName(command: string): string {
     // Remove any path components
@@ -179,6 +167,13 @@ export function validateWorkingDirectory(dir: string, allowedPaths: string[]): v
 export function normalizeWindowsPath(inputPath: string): string {
     // Convert forward slashes to backslashes
     let normalized = inputPath.replace(/\//g, '\\');
+    // Handle Git Bash style paths like /d/... (becomes \d\...)
+    const gitbashMatch = normalized.match(/^\\([a-zA-Z])\\(.*)/);
+    if (gitbashMatch) {
+        // Convert \d\path to D:\path
+        normalized = `${gitbashMatch[1].toUpperCase()}:\\${gitbashMatch[2]}`;
+        return path.normalize(normalized);
+    }
     
     // Handle Windows drive letter
     if (/^[a-zA-Z]:\\.+/.test(normalized)) {
@@ -193,4 +188,22 @@ export function normalizeWindowsPath(inputPath: string): string {
     }
     
     return path.normalize(normalized);
+}
+
+export function normalizeAllowedPaths(paths: string[]): string[] {
+  const normalized = paths.map(p => normalizeWindowsPath(p).toLowerCase());
+  const result: string[] = [];
+  for (const dir of normalized) {
+    if (result.includes(dir)) continue; // skip duplicates
+    // skip if dir is nested under any existing
+    if (result.some(parent => dir.startsWith(parent + path.sep))) continue;
+    // remove any existing nested under dir
+    for (let i = result.length - 1; i >= 0; i--) {
+      if (result[i].startsWith(dir + path.sep)) {
+        result.splice(i, 1);
+      }
+    }
+    result.push(dir);
+  }
+  return result;
 }

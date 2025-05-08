@@ -14,7 +14,9 @@ import {
   isArgumentBlocked,
   parseCommand,
   extractCommandName,
-  validateShellOperators
+  validateShellOperators,
+  normalizeWindowsPath,
+  validateWorkingDirectory
 } from './utils/validation.js';
 import { spawn } from 'child_process';
 import { z } from 'zod';
@@ -266,22 +268,20 @@ Example usage (Git Bash):
             this.validateCommand(args.shell as keyof ServerConfig['shells'], args.command);
 
             // Validate working directory if provided
-            let workingDir = args.workingDir ? 
-              path.resolve(args.workingDir) : 
-              process.cwd();
+            let workingDir = args.workingDir ? normalizeWindowsPath(args.workingDir) : process.cwd();
 
             const shellKey = args.shell as keyof typeof this.config.shells;
             const shellConfig = this.config.shells[shellKey];
             
             if (this.config.security.restrictWorkingDirectory) {
-              const isAllowedPath = Array.from(this.allowedPaths).some(
-                allowedPath => workingDir.startsWith(allowedPath)
-              );
-
-              if (!isAllowedPath) {
+              try {
+                // Use the normalized path for validation
+                validateWorkingDirectory(workingDir, Array.from(this.allowedPaths));
+              } catch (error) {
+                let originalWorkingDir = args.workingDir ? args.workingDir : process.cwd();
                 throw new McpError(
                   ErrorCode.InvalidRequest,
-                  `Working directory (${workingDir}) outside allowed paths. Consult the server admin for configuration changes (config.json - restrictWorkingDirectory, allowedPaths).`
+                  `Working directory (${originalWorkingDir}) outside allowed paths. Consult the server admin for configuration changes (config.json - restrictWorkingDirectory, allowedPaths).`
                 );
               }
             }

@@ -1,7 +1,5 @@
 import { describe, expect, test, jest } from '@jest/globals';
-import path from 'path';
 import {
-  resolveCommandPath,
   extractCommandName,
   isCommandBlocked,
   isArgumentBlocked,
@@ -9,6 +7,7 @@ import {
   isPathAllowed,
   validateWorkingDirectory,
   normalizeWindowsPath,
+  normalizeAllowedPaths,
   validateShellOperators
 } from '../src/utils/validation.js';
 import type { ShellConfig } from '../src/types/config.js';
@@ -121,42 +120,61 @@ describe('Command Parsing', () => {
   });
 });
 
-describe('Path Validation', () => {
-  const allowedPaths = [
-    'C:\\Users\\test',
-    'D:\\Projects'
-  ];
-
-  test('isPathAllowed validates paths correctly', () => {
-    expect(isPathAllowed('C:\\Users\\test\\docs', allowedPaths)).toBe(true);
-    expect(isPathAllowed('C:\\Users\\test', allowedPaths)).toBe(true);
-    expect(isPathAllowed('D:\\Projects\\code', allowedPaths)).toBe(true);
-    expect(isPathAllowed('E:\\NotAllowed', allowedPaths)).toBe(false);
-  });
-
-  test('isPathAllowed is case insensitive', () => {
-    expect(isPathAllowed('c:\\users\\TEST\\docs', allowedPaths)).toBe(true);
-    expect(isPathAllowed('D:\\PROJECTS\\code', allowedPaths)).toBe(true);
-  });
-
-  test('validateWorkingDirectory throws for invalid paths', () => {
-    expect(() => validateWorkingDirectory('relative/path', allowedPaths))
-      .toThrow('Working directory must be an absolute path');
-    expect(() => validateWorkingDirectory('E:\\NotAllowed', allowedPaths))
-      .toThrow('Working directory must be within allowed paths');
-  });
-});
-
 describe('Path Normalization', () => {
   test('normalizeWindowsPath handles various formats', () => {
     expect(normalizeWindowsPath('C:/Users/test')).toBe('C:\\Users\\test');
     expect(normalizeWindowsPath('\\Users\\test')).toBe('C:\\Users\\test');
     expect(normalizeWindowsPath('D:\\Projects')).toBe('D:\\Projects');
+    expect(normalizeWindowsPath('/c/Users/Projects')).toBe('C:\\Users\\Projects');
   });
 
   test('normalizeWindowsPath removes redundant separators', () => {
     expect(normalizeWindowsPath('C:\\\\Users\\\\test')).toBe('C:\\Users\\test');
     expect(normalizeWindowsPath('C:/Users//test')).toBe('C:\\Users\\test');
+  });
+});
+
+describe('Allowed Paths Normalization', () => {
+  test('removes duplicates and normalizes paths', () => {
+    const paths = ['C:/Test', 'c:\\test', '/c/Test'];
+    expect(normalizeAllowedPaths(paths)).toEqual(['c:\\test']);
+  });
+  test('removes nested subpaths', () => {
+    const paths = ['/d/mcp', '/d/mcp/my'];
+    expect(normalizeAllowedPaths(paths)).toEqual(['d:\\mcp']);
+  });
+  test('keeps multiple top-level paths', () => {
+    const paths = ['/c/Users', '/d/Projects'];
+    expect(normalizeAllowedPaths(paths)).toEqual(['c:\\users', 'd:\\projects']);
+  });
+});
+
+describe('Path Validation', () => {
+  // allowed paths in normalized format
+  const allowedPaths = [
+    'C:\\Users\\test',
+    'D:\\Projects',
+    'C:\\Users\\Projects'
+  ];
+
+  test('isPathAllowed validates paths correctly', () => {
+    expect(isPathAllowed(normalizeWindowsPath('C:\\Users\\test\\docs'), allowedPaths)).toBe(true);
+    expect(isPathAllowed(normalizeWindowsPath('C:\\Users\\test'), allowedPaths)).toBe(true);
+    expect(isPathAllowed(normalizeWindowsPath('/c/Users/Projects'), allowedPaths)).toBe(true);
+    expect(isPathAllowed(normalizeWindowsPath('D:\\Projects\\code'), allowedPaths)).toBe(true);
+    expect(isPathAllowed(normalizeWindowsPath('E:\\NotAllowed'), allowedPaths)).toBe(false);
+  });
+
+  test('isPathAllowed is case insensitive', () => {
+    expect(isPathAllowed(normalizeWindowsPath('c:\\users\\TEST\\docs'), allowedPaths)).toBe(true);
+    expect(isPathAllowed(normalizeWindowsPath('D:\\PROJECTS\\code'), allowedPaths)).toBe(true);
+  });
+
+  test('validateWorkingDirectory throws for invalid paths', () => {
+    expect(() => validateWorkingDirectory(normalizeWindowsPath('relative/path'), allowedPaths))
+      .toThrow('Working directory must be an absolute path');
+    expect(() => validateWorkingDirectory(normalizeWindowsPath('E:\\NotAllowed'), allowedPaths))
+      .toThrow('Working directory must be within allowed paths');
   });
 });
 

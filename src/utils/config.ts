@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { ServerConfig, ShellConfig } from '../types/config.js';
+import { normalizeWindowsPath, normalizeAllowedPaths } from './validation.js';
 
 const defaultValidatePathRegex = /^[a-zA-Z]:\\(?:[^<>:"/\\|?*]+\\)*[^<>:"/\\|?*]*$/;
 
@@ -69,7 +70,6 @@ export function loadConfig(configPath?: string): ServerConfig {
       if (fs.existsSync(location)) {
         const fileContent = fs.readFileSync(location, 'utf8');
         loadedConfig = JSON.parse(fileContent);
-        console.error(`Loaded config from ${location}`);
         break;
       }
     } catch (error) {
@@ -81,6 +81,9 @@ export function loadConfig(configPath?: string): ServerConfig {
   const mergedConfig = Object.keys(loadedConfig).length > 0 
     ? mergeConfigs(DEFAULT_CONFIG, loadedConfig)
     : DEFAULT_CONFIG;
+
+  // Normalize and dedupe allowedPaths
+  mergedConfig.security.allowedPaths = normalizeAllowedPaths(mergedConfig.security.allowedPaths);
 
   // Validate the merged config
   validateConfig(mergedConfig);
