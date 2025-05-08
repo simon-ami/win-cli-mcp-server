@@ -69,7 +69,6 @@ export function loadConfig(configPath?: string): ServerConfig {
       if (fs.existsSync(location)) {
         const fileContent = fs.readFileSync(location, 'utf8');
         loadedConfig = JSON.parse(fileContent);
-        console.error(`Loaded config from ${location}`);
         break;
       }
     } catch (error) {
@@ -81,6 +80,9 @@ export function loadConfig(configPath?: string): ServerConfig {
   const mergedConfig = Object.keys(loadedConfig).length > 0 
     ? mergeConfigs(DEFAULT_CONFIG, loadedConfig)
     : DEFAULT_CONFIG;
+
+  // Normalize allowedPaths for case-insensitive comparison and consistent separators
+  mergedConfig.security.allowedPaths = mergedConfig.security.allowedPaths.map(p => path.normalize(p).toLowerCase());
 
   // Validate the merged config
   validateConfig(mergedConfig);
