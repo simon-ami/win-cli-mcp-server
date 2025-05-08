@@ -18,8 +18,6 @@
     "blockedArguments": ["-rf", "/f", "/s", "/q"],
     "allowedPaths": ["C:\\Users\\YourUsername", "C:\\Projects"],
     "restrictWorkingDirectory": true,
-    "logCommands": true,
-    "maxHistorySize": 1000,
     "commandTimeout": 30,
     "enableInjectionProtection": true
   },

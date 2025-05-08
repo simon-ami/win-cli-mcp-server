@@ -39,7 +39,6 @@ It allows MCP clients (like [Claude Desktop](https://claude.ai/download)) to per
   - Command blocking (full paths, case variations)
   - Working directory validation
   - Maximum command length limits
-  - Command logging and history tracking
   - Smart argument validation
 - **Configurable**:
   - Custom security rules
@@ -151,8 +150,6 @@ If no configuration file is found, the server will use a default (restricted) co
     ],
     "allowedPaths": ["User's home directory", "Current working directory"],
     "restrictWorkingDirectory": true,
-    "logCommands": true,
-    "maxHistorySize": 1000,
     "commandTimeout": 30,
     "enableInjectionProtection": true
   },
@@ -229,12 +226,6 @@ The configuration file is divided into two main sections: `security` and `shells
 
     // If true, commands can only run in allowedPaths
     "restrictWorkingDirectory": true,
-
-    // If true, saves command history
-    "logCommands": true,
-
-    // Maximum number of commands to keep in history
-    "maxHistorySize": 1000,
 
     // Timeout for command execution in seconds (default: 30)
     "commandTimeout": 30,
@@ -317,14 +308,13 @@ This server allows external tools to execute commands on your system. Exercise e
 ### Configurable Security Features (Active by Default)
 
 - **Working Directory Restriction (`restrictWorkingDirectory`)**: HIGHLY RECOMMENDED. Limits command execution to safe directories.
-- **Command Logging (`logCommands`)**: Recommended for auditing.
 - **Injection Protection (`enableInjectionProtection`)**: Recommended to prevent bypassing security rules.
 
 ### Best Practices
 
 - **Minimal Allowed Paths**: Only allow execution in necessary directories.
 - **Restrictive Blocklists**: Block any potentially harmful commands or arguments.
-- **Regularly Review Logs**: Check the command history (if enabled) for suspicious activity.
+- **Regularly Review Logs**: Check the command history for suspicious activity.
 - **Keep Software Updated**: Ensure Node.js, npm, and the server itself are up-to-date.
 
 ## License
