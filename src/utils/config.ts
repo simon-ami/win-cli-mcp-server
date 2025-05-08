@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { ServerConfig, ShellConfig } from '../types/config.js';
-import { normalizeWindowsPath } from './validation.js';
+import { normalizeWindowsPath, normalizeAllowedPaths } from './validation.js';
 
 const defaultValidatePathRegex = /^[a-zA-Z]:\\(?:[^<>:"/\\|?*]+\\)*[^<>:"/\\|?*]*$/;
 
@@ -82,8 +82,8 @@ export function loadConfig(configPath?: string): ServerConfig {
     ? mergeConfigs(DEFAULT_CONFIG, loadedConfig)
     : DEFAULT_CONFIG;
 
-  // Normalize allowedPaths for case-insensitive comparison and consistent separators
-  mergedConfig.security.allowedPaths = mergedConfig.security.allowedPaths.map(p => normalizeWindowsPath(p).toLowerCase());
+  // Normalize and dedupe allowedPaths
+  mergedConfig.security.allowedPaths = normalizeAllowedPaths(mergedConfig.security.allowedPaths);
 
   // Validate the merged config
   validateConfig(mergedConfig);

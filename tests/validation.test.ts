@@ -7,6 +7,7 @@ import {
   isPathAllowed,
   validateWorkingDirectory,
   normalizeWindowsPath,
+  normalizeAllowedPaths,
   validateShellOperators
 } from '../src/utils/validation.js';
 import type { ShellConfig } from '../src/types/config.js';
@@ -130,6 +131,21 @@ describe('Path Normalization', () => {
   test('normalizeWindowsPath removes redundant separators', () => {
     expect(normalizeWindowsPath('C:\\\\Users\\\\test')).toBe('C:\\Users\\test');
     expect(normalizeWindowsPath('C:/Users//test')).toBe('C:\\Users\\test');
+  });
+});
+
+describe('Allowed Paths Normalization', () => {
+  test('removes duplicates and normalizes paths', () => {
+    const paths = ['C:/Test', 'c:\\test', '/c/Test'];
+    expect(normalizeAllowedPaths(paths)).toEqual(['c:\\test']);
+  });
+  test('removes nested subpaths', () => {
+    const paths = ['/d/mcp', '/d/mcp/my'];
+    expect(normalizeAllowedPaths(paths)).toEqual(['d:\\mcp']);
+  });
+  test('keeps multiple top-level paths', () => {
+    const paths = ['/c/Users', '/d/Projects'];
+    expect(normalizeAllowedPaths(paths)).toEqual(['c:\\users', 'd:\\projects']);
   });
 });
 
