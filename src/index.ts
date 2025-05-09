@@ -202,6 +202,17 @@ class CLIServer {
           inputSchema: { type: "object", properties: {} }
         },
         {
+          name: "set_current_directory",
+          description: "Set the current working directory",
+          inputSchema: { 
+            type: "object", 
+            properties: { 
+              path: { type: "string", description: "Path to set as current working directory" } 
+            },
+            required: ["path"]
+          }
+        },
+        {
           name: "get_config",
           description: "Get the windows CLI server configuration",
           inputSchema: { type: "object", properties: {} }
@@ -347,6 +358,50 @@ class CLIServer {
               isError: false,
               metadata: {}
             };
+          }
+          
+          case "set_current_directory": {
+            // Parse args
+            const args = z.object({
+              path: z.string()
+            }).parse(request.params.arguments);
+            
+            // Normalize the path
+            const newDir = normalizeWindowsPath(args.path);
+            
+            // Validate the path
+            try {
+              if (this.config.security.restrictWorkingDirectory) {
+                validateWorkingDirectory(newDir, Array.from(this.allowedPaths));
+              }
+              
+              // Change directory
+              process.chdir(newDir);
+              
+              const currentDir = process.cwd();
+              return {
+                content: [{
+                  type: "text",
+                  text: `Current directory changed to: ${currentDir}`
+                }],
+                isError: false,
+                metadata: {
+                  previousDirectory: args.path,
+                  newDirectory: currentDir
+                }
+              };
+            } catch (error) {
+              return {
+                content: [{
+                  type: "text",
+                  text: `Failed to change directory: ${error instanceof Error ? error.message : String(error)}`
+                }],
+                isError: true,
+                metadata: {
+                  requestedDirectory: args.path
+                }
+              };
+            }
           }
           
           case "get_config": {
