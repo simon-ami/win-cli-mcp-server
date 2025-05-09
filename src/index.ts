@@ -24,6 +24,7 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import { buildToolDescription } from './utils/toolDescription.js';
 import { loadConfig, createDefaultConfig } from './utils/config.js';
+import { createSerializableConfig } from './utils/configUtils.js';
 import type { ServerConfig } from './types/config.js';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
@@ -123,6 +124,14 @@ class CLIServer {
   private escapeRegex(text: string): string {
     return text.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
   }
+  
+  /**
+   * Creates a structured copy of the configuration for external use
+   * @returns A serializable version of the configuration
+   */
+  private getSafeConfig(): any {
+    return createSerializableConfig(this.config);
+  }
 
   private setupHandlers(): void {
     // List available resources
@@ -146,15 +155,8 @@ class CLIServer {
       
       // Handle CLI configuration resource
       if (uri === "cli://config") {
-        // Create a safe copy of config (excluding sensitive information)
-        const safeConfig = {
-          security: {
-            ...this.config.security,
-          },
-          shells: {
-            ...this.config.shells
-          }
-        };
+        // Create a structured copy of config for external use
+        const safeConfig = this.getSafeConfig();
         
         return {
           contents: [{
@@ -197,6 +199,11 @@ class CLIServer {
         {
           name: "get_current_directory",
           description: "Get the current working directory",
+          inputSchema: { type: "object", properties: {} }
+        },
+        {
+          name: "get_config",
+          description: "Get the windows CLI server configuration",
           inputSchema: { type: "object", properties: {} }
         }
       ];
@@ -330,9 +337,29 @@ class CLIServer {
             });
           }
 
-          case 'get_current_directory': {
+          case "get_current_directory": {
             const currentDir = process.cwd();
-            return { content: [{ type: 'text', text: `Current working directory: ${currentDir}` }] };
+            return {
+              content: [{
+                type: "text",
+                text: currentDir
+              }],
+              isError: false,
+              metadata: {}
+            };
+          }
+          
+          case "get_config": {
+            // Create a structured copy of config for external use
+            const safeConfig = this.getSafeConfig();
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify(safeConfig, null, 2)
+              }],
+              isError: false,
+              metadata: {}
+            };
           }
 
           default:
