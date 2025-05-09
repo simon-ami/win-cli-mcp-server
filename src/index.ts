@@ -20,13 +20,20 @@ import {
 } from './utils/validation.js';
 import { spawn } from 'child_process';
 import { z } from 'zod';
+import { readFileSync } from 'fs';
 import path from 'path';
+import { buildToolDescription } from './utils/toolDescription.js';
 import { loadConfig, createDefaultConfig } from './utils/config.js';
+import { createSerializableConfig } from './utils/configUtils.js';
 import type { ServerConfig } from './types/config.js';
 import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 const require = createRequire(import.meta.url);
-const packageJson = require('../package.json');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
 
 // Parse command line arguments using yargs
 import yargs from 'yargs/yargs';
@@ -117,19 +124,19 @@ class CLIServer {
   private escapeRegex(text: string): string {
     return text.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
   }
+  
+  /**
+   * Creates a structured copy of the configuration for external use
+   * @returns A serializable version of the configuration
+   */
+  private getSafeConfig(): any {
+    return createSerializableConfig(this.config);
+  }
 
   private setupHandlers(): void {
     // List available resources
     this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
       const resources: Array<{uri:string,name:string,description:string,mimeType:string}> = [];
-      
-      // Add a resource for the current working directory
-      resources.push({
-        uri: "cli://currentdir",
-        name: "Current Working Directory",
-        description: "The current working directory of the CLI server",
-        mimeType: "text/plain"
-      });
       
       // Add a resource for CLI configuration
       resources.push({
@@ -146,29 +153,10 @@ class CLIServer {
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const uri = request.params.uri;
       
-      // Handle current directory resource
-      if (uri === "cli://currentdir") {
-        const currentDir = process.cwd();
-        return {
-          contents: [{
-            uri,
-            mimeType: "text/plain",
-            text: currentDir
-          }]
-        };
-      }
-      
       // Handle CLI configuration resource
       if (uri === "cli://config") {
-        // Create a safe copy of config (excluding sensitive information)
-        const safeConfig = {
-          security: {
-            ...this.config.security,
-          },
-          shells: {
-            ...this.config.shells
-          }
-        };
+        // Create a structured copy of config for external use
+        const safeConfig = this.getSafeConfig();
         
         return {
           contents: [{
@@ -185,57 +173,25 @@ class CLIServer {
       );
     });
 
-    // List available tools
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: [
+    // List available tools: log execute_command description then return tools
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+      const allowedShells = (Object.keys(this.config.shells) as Array<keyof typeof this.config.shells>)
+        .filter(shell => this.config.shells[shell].enabled);
+      const descriptionLines = [
+        ...buildToolDescription(allowedShells)
+      ];
+      const description = descriptionLines.join("\n");
+      console.error(`[tool: execute_command] Description:\n${description}`);
+      const tools = [
         {
           name: "execute_command",
-          description: `Execute a command in the specified shell (powershell, cmd, or gitbash)
-
-Example usage (PowerShell):
-\`\`\`json
-{
-  "shell": "powershell",
-  "command": "Get-Process | Select-Object -First 5",
-  "workingDir": "C:\\Users\\username"
-}
-\`\`\`
-
-Example usage (CMD):
-\`\`\`json
-{
-  "shell": "cmd",
-  "command": "dir /b",
-  "workingDir": "C:\\Projects"
-}
-\`\`\`
-
-Example usage (Git Bash):
-\`\`\`json
-{
-  "shell": "gitbash",
-  "command": "ls -la",
-  "workingDir": "/c/Users/username"
-}
-\`\`\``,
+          description,
           inputSchema: {
             type: "object",
             properties: {
-              shell: {
-                type: "string",
-                enum: Object.keys(this.config.shells).filter(shell => 
-                  this.config.shells[shell as keyof typeof this.config.shells].enabled
-                ),
-                description: "Shell to use for command execution"
-              },
-              command: {
-                type: "string",
-                description: "Command to execute"
-              },
-              workingDir: {
-                type: "string",
-                description: "Working directory for command execution (optional)"
-              }
+              shell: { type: "string", enum: allowedShells, description: "Shell to use for command execution" },
+              command: { type: "string", description: "Command to execute" },
+              workingDir: { type: "string", description: "Working directory (optional)" }
             },
             required: ["shell", "command"]
           }
@@ -243,19 +199,23 @@ Example usage (Git Bash):
         {
           name: "get_current_directory",
           description: "Get the current working directory",
-          inputSchema: {
-            type: "object",
-            properties: {} // No input parameters needed
-          }
+          inputSchema: { type: "object", properties: {} }
+        },
+        {
+          name: "get_config",
+          description: "Get the windows CLI server configuration",
+          inputSchema: { type: "object", properties: {} }
         }
-      ]
-    }));
+      ];
+      return { tools };
+    });
 
     // Handle tool execution
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
         switch (request.params.name) {
           case "execute_command": {
+            // parse args with allowed shells
             const args = z.object({
               shell: z.enum(Object.keys(this.config.shells).filter(shell => 
                 this.config.shells[shell as keyof typeof this.config.shells].enabled
@@ -377,9 +337,29 @@ Example usage (Git Bash):
             });
           }
 
-          case 'get_current_directory': {
+          case "get_current_directory": {
             const currentDir = process.cwd();
-            return { content: [{ type: 'text', text: `Current working directory: ${currentDir}` }] };
+            return {
+              content: [{
+                type: "text",
+                text: currentDir
+              }],
+              isError: false,
+              metadata: {}
+            };
+          }
+          
+          case "get_config": {
+            // Create a structured copy of config for external use
+            const safeConfig = this.getSafeConfig();
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify(safeConfig, null, 2)
+              }],
+              isError: false,
+              metadata: {}
+            };
           }
 
           default:
