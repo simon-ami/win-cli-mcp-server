@@ -18,6 +18,7 @@ import {
   normalizeWindowsPath,
   validateWorkingDirectory
 } from './utils/validation.js';
+import { validateDirectoriesAndThrow } from './utils/directoryValidator.js';
 import { spawn } from 'child_process';
 import { z } from 'zod';
 import { readFileSync } from 'fs';
@@ -53,6 +54,10 @@ const parseArgs = async () => {
     .help()
     .parse();
 };
+
+const ValidateDirectoriesArgsSchema = z.object({
+  directories: z.array(z.string()),
+});
 
 class CLIServer {
   private server: Server;
@@ -216,6 +221,17 @@ class CLIServer {
           name: "get_config",
           description: "Get the windows CLI server configuration",
           inputSchema: { type: "object", properties: {} }
+        },
+        {
+          name: "validate_directories",
+          description: "Check if directories are within allowed paths (only available when restrictWorkingDirectory is enabled)",
+          inputSchema: {
+            type: "object",
+            properties: {
+              directories: { type: "array", items: { type: "string" }, description: "List of directories to validate" }
+            },
+            required: ["directories"]
+          }
         }
       ];
       return { tools };
@@ -252,7 +268,7 @@ class CLIServer {
                 let originalWorkingDir = args.workingDir ? args.workingDir : process.cwd();
                 throw new McpError(
                   ErrorCode.InvalidRequest,
-                  `Working directory (${originalWorkingDir}) outside allowed paths. Consult the server admin for configuration changes (config.json - restrictWorkingDirectory, allowedPaths).`
+                  `Working directory (${originalWorkingDir}) outside allowed paths. Use validate_directories tool to validate directories before execution.`
                 );
               }
             }
@@ -403,7 +419,62 @@ class CLIServer {
               };
             }
           }
-          
+
+          case "validate_directories": {
+            if (!this.config.security.restrictWorkingDirectory) {
+              return {
+                content: [{
+                  type: "text",
+                  text: "Directory validation is disabled because 'restrictWorkingDirectory' is not enabled in the server configuration."
+                }],
+                isError: true,
+                metadata: {}
+              };
+            }
+            try {
+              const parsedValDirArgs = ValidateDirectoriesArgsSchema.parse(request.params.arguments);
+              const allowedPathsArray = this.config.security.allowedPaths ?? [];
+              validateDirectoriesAndThrow(parsedValDirArgs.directories, allowedPathsArray);
+              return {
+                content: [{
+                  type: "text",
+                  text: JSON.stringify({ message: "All specified directories are valid and within allowed paths." })
+                }],
+                isError: false,
+                metadata: {}
+              };
+            } catch (error: any) {
+              if (error instanceof z.ZodError) {
+                return {
+                  content: [{
+                    type: "text",
+                    text: `Invalid arguments for validate_directories: ${error.errors.map(e => `${e.path.join('.')} - ${e.message}`).join(', ')}`
+                  }],
+                  isError: true,
+                  metadata: {}
+                };
+              } else if (error instanceof McpError) {
+                return {
+                  content: [{
+                    type: "text",
+                    text: error.message
+                  }],
+                  isError: true,
+                  metadata: {}
+                };
+              } else {
+                return {
+                  content: [{
+                    type: "text",
+                    text: `An unexpected error occurred during directory validation: ${error.message || String(error)}`
+                  }],
+                  isError: true,
+                  metadata: {}
+                };
+              }
+            }
+          }
+
           case "get_config": {
             // Create a structured copy of config for external use
             const safeConfig = this.getSafeConfig();

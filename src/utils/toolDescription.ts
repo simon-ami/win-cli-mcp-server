@@ -11,6 +11,7 @@ export function buildToolDescription(allowedShells: string[]): string[] {
     "1. Request config of this MCP server configuration using tools",
     "2. Follow limitations taken from configuration",
     "3. Use workingDir parameter for command based on task description",
+    "4. Use validate_directories tool to validate directories before execution",
     ""
   ];
 
