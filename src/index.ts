@@ -129,14 +129,6 @@ class CLIServer {
     this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
       const resources: Array<{uri:string,name:string,description:string,mimeType:string}> = [];
       
-      // Add a resource for the current working directory
-      resources.push({
-        uri: "cli://currentdir",
-        name: "Current Working Directory",
-        description: "The current working directory of the CLI server",
-        mimeType: "text/plain"
-      });
-      
       // Add a resource for CLI configuration
       resources.push({
         uri: "cli://config",
@@ -151,18 +143,6 @@ class CLIServer {
     // Read resource content
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const uri = request.params.uri;
-      
-      // Handle current directory resource
-      if (uri === "cli://currentdir") {
-        const currentDir = process.cwd();
-        return {
-          contents: [{
-            uri,
-            mimeType: "text/plain",
-            text: currentDir
-          }]
-        };
-      }
       
       // Handle CLI configuration resource
       if (uri === "cli://config") {

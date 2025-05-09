@@ -287,9 +287,6 @@ The configuration file is divided into two main sections: `security` and `shells
 
 ### Resources
 
-- **cli://currentdir**
-  - Returns the current working directory of the CLI server.
-
 - **cli://config**
   - Returns the main CLI server configuration (excluding sensitive data like blocked command details if security requires it).
 
