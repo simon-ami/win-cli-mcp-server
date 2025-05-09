@@ -6,6 +6,11 @@
 export function buildToolDescription(allowedShells: string[]): string[] {
   const descriptionLines: string[] = [
     `Execute a command in the specified shell (${allowedShells.join(', ')})`,
+    "",
+    "Before first usage of windows-cli MCP server with execute_command tool, perform the following actions:",
+    "1. Request config of this MCP server configuration using tools",
+    "2. Follow limitations taken from configuration",
+    "3. Use workingDir parameter for command based on task description",
     ""
   ];
 
