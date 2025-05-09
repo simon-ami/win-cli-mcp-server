@@ -295,6 +295,13 @@ The configuration file is divided into two main sections: `security` and `shells
   - Get the windows CLI server configuration
   - Returns the server configuration as a JSON string (excluding sensitive data)
 
+- **validate_directories**
+  - Check if specified directories are within allowed paths
+  - Only available when `restrictWorkingDirectory` is enabled in configuration
+  - Inputs:
+    - `directories` (array of strings): List of directory paths to validate
+  - Returns success message if all directories are valid, or error message detailing which directories are outside allowed paths
+
 ### Resources
 
 - **cli://config**
