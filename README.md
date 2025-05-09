@@ -285,6 +285,16 @@ The configuration file is divided into two main sections: `security` and `shells
   - Get the current working directory of the server
   - Returns the current working directory path
 
+- **set_current_directory**
+  - Set the current working directory of the server
+  - Inputs:
+    - `path` (string): Path to set as current working directory
+  - Returns confirmation message with the new directory path, or error message if the change fails
+
+- **get_config**
+  - Get the windows CLI server configuration
+  - Returns the server configuration as a JSON string (excluding sensitive data)
+
 ### Resources
 
 - **cli://config**
