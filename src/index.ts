@@ -20,13 +20,19 @@ import {
 } from './utils/validation.js';
 import { spawn } from 'child_process';
 import { z } from 'zod';
+import { readFileSync } from 'fs';
 import path from 'path';
+import { buildToolDescription } from './utils/toolDescription.js';
 import { loadConfig, createDefaultConfig } from './utils/config.js';
 import type { ServerConfig } from './types/config.js';
 import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 const require = createRequire(import.meta.url);
-const packageJson = require('../package.json');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
 
 // Parse command line arguments using yargs
 import yargs from 'yargs/yargs';
@@ -185,57 +191,25 @@ class CLIServer {
       );
     });
 
-    // List available tools
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: [
+    // List available tools: log execute_command description then return tools
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+      const allowedShells = (Object.keys(this.config.shells) as Array<keyof typeof this.config.shells>)
+        .filter(shell => this.config.shells[shell].enabled);
+      const descriptionLines = [
+        ...buildToolDescription(allowedShells)
+      ];
+      const description = descriptionLines.join("\n");
+      console.error(`[tool: execute_command] Description:\n${description}`);
+      const tools = [
         {
           name: "execute_command",
-          description: `Execute a command in the specified shell (powershell, cmd, or gitbash)
-
-Example usage (PowerShell):
-\`\`\`json
-{
-  "shell": "powershell",
-  "command": "Get-Process | Select-Object -First 5",
-  "workingDir": "C:\\Users\\username"
-}
-\`\`\`
-
-Example usage (CMD):
-\`\`\`json
-{
-  "shell": "cmd",
-  "command": "dir /b",
-  "workingDir": "C:\\Projects"
-}
-\`\`\`
-
-Example usage (Git Bash):
-\`\`\`json
-{
-  "shell": "gitbash",
-  "command": "ls -la",
-  "workingDir": "/c/Users/username"
-}
-\`\`\``,
+          description,
           inputSchema: {
             type: "object",
             properties: {
-              shell: {
-                type: "string",
-                enum: Object.keys(this.config.shells).filter(shell => 
-                  this.config.shells[shell as keyof typeof this.config.shells].enabled
-                ),
-                description: "Shell to use for command execution"
-              },
-              command: {
-                type: "string",
-                description: "Command to execute"
-              },
-              workingDir: {
-                type: "string",
-                description: "Working directory for command execution (optional)"
-              }
+              shell: { type: "string", enum: allowedShells, description: "Shell to use for command execution" },
+              command: { type: "string", description: "Command to execute" },
+              workingDir: { type: "string", description: "Working directory (optional)" }
             },
             required: ["shell", "command"]
           }
@@ -243,19 +217,18 @@ Example usage (Git Bash):
         {
           name: "get_current_directory",
           description: "Get the current working directory",
-          inputSchema: {
-            type: "object",
-            properties: {} // No input parameters needed
-          }
+          inputSchema: { type: "object", properties: {} }
         }
-      ]
-    }));
+      ];
+      return { tools };
+    });
 
     // Handle tool execution
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
         switch (request.params.name) {
           case "execute_command": {
+            // parse args with allowed shells
             const args = z.object({
               shell: z.enum(Object.keys(this.config.shells).filter(shell => 
                 this.config.shells[shell as keyof typeof this.config.shells].enabled
