@@ -198,7 +198,7 @@ describe('Path Validation', () => {
 
   test('validateWorkingDirectory throws for invalid paths', () => {
     expect(() => validateWorkingDirectory(normalizeWindowsPath('relative/path'), allowedPaths))
-      .toThrow('Working directory must be an absolute path');
+      .toThrow('Working directory must be within allowed paths');
     expect(() => validateWorkingDirectory(normalizeWindowsPath('E:\\NotAllowed'), allowedPaths))
       .toThrow('Working directory must be within allowed paths');
   });
