@@ -2,8 +2,10 @@ import path from 'path';
 import type { ShellConfig } from '../types/config.js';
 
 export function extractCommandName(command: string): string {
+    // Replace backslashes with forward slashes
+    const normalizedCommand = command.replace(/\\/g, '/');
     // Remove any path components
-    const basename = path.basename(command);
+    const basename = path.basename(normalizedCommand);
     // Remove extension
     return basename.replace(/\.(exe|cmd|bat)$/i, '').toLowerCase();
 }
@@ -144,25 +146,35 @@ export function parseCommand(fullCommand: string): { command: string; args: stri
 }
 
 export function isPathAllowed(testPath: string, allowedPaths: string[]): boolean {
-    // Ensure consistent path format without trailing slash
-    const normalizedPath = path.normalize(testPath)
+    // Step 1: Normalize testPath
+    const normalizedTestPath = normalizeWindowsPath(testPath)
         .toLowerCase()
-        .replace(/\\$/, ''); // Remove trailing backslash if present
-    
+        .replace(/\\$/, ''); // Remove trailing backslash
+
+    // Step 2: Iterate through allowedPaths
     return allowedPaths.some(allowedPath => {
-        // Ensure consistent path format without trailing slash for allowed paths too
-        const normalizedAllowedPath = path.normalize(allowedPath)
+        // Step 2a: Normalize current allowedPath
+        const normalizedAllowedPath = normalizeWindowsPath(allowedPath)
             .toLowerCase()
-            .replace(/\\$/, ''); // Remove trailing backslash if present
-            
-        // Check if test path starts with allowed path
-        return normalizedPath === normalizedAllowedPath || 
-               normalizedPath.startsWith(normalizedAllowedPath + path.sep);
+            .replace(/\\$/, ''); // Remove trailing backslash
+
+        // Step 3: Comparison Logic
+        // a. Exact match
+        if (normalizedTestPath === normalizedAllowedPath) {
+            return true;
+        }
+        // b. Starts with allowedPath + path separator
+        // path.sep should be '\\' after normalizeWindowsPath
+        if (normalizedTestPath.startsWith(normalizedAllowedPath + '\\')) {
+            return true;
+        }
+        return false;
     });
 }
 
 export function validateWorkingDirectory(dir: string, allowedPaths: string[]): void {
-    if (!path.isAbsolute(dir)) {
+    const isWindowsDriveAbsolute = /^[a-zA-Z]:\\/.test(dir);
+    if (!isWindowsDriveAbsolute && !path.isAbsolute(dir)) {
         throw new Error('Working directory must be an absolute path');
     }
 
@@ -175,45 +187,94 @@ export function validateWorkingDirectory(dir: string, allowedPaths: string[]): v
 }
 
 export function normalizeWindowsPath(inputPath: string): string {
-    // Convert forward slashes to backslashes
-    let normalized = inputPath.replace(/\//g, '\\');
-    // Handle Git Bash style paths like /d/... (becomes \d\...)
-    const gitbashMatch = normalized.match(/^\\([a-zA-Z])\\(.*)/);
+    let currentPath = inputPath; 
+
+    const hadTrailingSlash = /[/\\]$/.test(currentPath) && currentPath.length > 1;
+
+    currentPath = currentPath.replace(/\//g, '\\');
+
+    const gitbashMatch = currentPath.match(/^\\([a-zA-Z])(\\|$)(.*)/);
     if (gitbashMatch) {
-        // Convert \d\path to D:\path
-        normalized = `${gitbashMatch[1].toUpperCase()}:\\${gitbashMatch[2]}`;
-        return path.normalize(normalized);
+        currentPath = `${gitbashMatch[1].toUpperCase()}:\\${gitbashMatch[3]}`;
+    } 
+    else if (currentPath.startsWith('\\\\')) {
+        // UNC path, already absolute
+    } 
+    else if (currentPath.startsWith('\\')) {
+        const hasDriveLetterAfterInitialSlash = /^[a-zA-Z]:/.test(currentPath.substring(1));
+        if (hasDriveLetterAfterInitialSlash) { 
+            currentPath = currentPath.substring(1); 
+        } else { 
+            currentPath = `C:\\${currentPath.substring(1)}`; 
+        }
+    } 
+    else { 
+        if (/^[a-zA-Z]:(?![\\/])/.test(currentPath)) { 
+            currentPath = `${currentPath.substring(0, 2)}\\${currentPath.substring(2)}`;
+        } 
+        else if (!/^[a-zA-Z]:/.test(currentPath)) { 
+            currentPath = `C:\\${currentPath}`;
+        }
     }
     
-    // Handle Windows drive letter
-    if (/^[a-zA-Z]:\\.+/.test(normalized)) {
-        // Already in correct form
-        return path.normalize(normalized);
+    let finalPath = path.normalize(currentPath);
+
+    const driveLetterMatchCleanup = finalPath.match(/^([a-z]):(.*)/);
+    if (driveLetterMatchCleanup) {
+        finalPath = `${driveLetterMatchCleanup[1].toUpperCase()}:${driveLetterMatchCleanup[2]}`;
     }
+
+    finalPath = finalPath.replace(/\\+/g, '\\');
     
-    // Handle paths without drive letter
-    if (normalized.startsWith('\\')) {
-        // Assume C: drive if not specified
-        normalized = `C:${normalized}`;
+    if (finalPath.match(/^[a-zA-Z]:$/)) {
+        finalPath += '\\';
     }
-    
-    return path.normalize(normalized);
+
+    if (hadTrailingSlash && !finalPath.endsWith('\\')) {
+        finalPath += '\\';
+    } else if (!hadTrailingSlash && finalPath.endsWith('\\') && finalPath.length > 3) { 
+        finalPath = finalPath.replace(/\\$/, ''); 
+    }
+
+    return finalPath;
 }
 
 export function normalizeAllowedPaths(paths: string[]): string[] {
-  const normalized = paths.map(p => normalizeWindowsPath(p).toLowerCase());
-  const result: string[] = [];
-  for (const dir of normalized) {
-    if (result.includes(dir)) continue; // skip duplicates
-    // skip if dir is nested under any existing
-    if (result.some(parent => dir.startsWith(parent + path.sep))) continue;
-    // remove any existing nested under dir
-    for (let i = result.length - 1; i >= 0; i--) {
-      if (result[i].startsWith(dir + path.sep)) {
-        result.splice(i, 1);
-      }
+    // Step 1: Initial Normalization
+    const normalizedInputPaths = paths.map(p => normalizeWindowsPath(p).toLowerCase());
+
+    // Step 2: Processing and Filtering
+    const processedPaths: string[] = [];
+
+    for (const currentPath of normalizedInputPaths) {
+        // a. Create a version of currentPath without a trailing backslash
+        const comparableCurrentPath = currentPath.replace(/\\$/, '');
+
+        // b. Check for Duplicates
+        if (processedPaths.some(existingPath => existingPath.replace(/\\$/, '') === comparableCurrentPath)) {
+            continue;
+        }
+
+        // c. Check for Nesting (currentPath is child of an existing path)
+        if (processedPaths.some(existingPath => {
+            const comparableExistingPath = existingPath.replace(/\\$/, '');
+            return comparableCurrentPath.startsWith(comparableExistingPath + '\\');
+        })) {
+            continue;
+        }
+
+        // d. Remove Existing Nested Children (existing path is child of currentPath)
+        for (let i = processedPaths.length - 1; i >= 0; i--) {
+            const comparableExistingPath = processedPaths[i].replace(/\\$/, '');
+            if (comparableExistingPath.startsWith(comparableCurrentPath + '\\')) {
+                processedPaths.splice(i, 1);
+            }
+        }
+        
+        // e. Add comparableCurrentPath (the version without the trailing slash)
+        processedPaths.push(comparableCurrentPath);
     }
-    result.push(dir);
-  }
-  return result;
+
+    // Step 3: Return
+    return processedPaths;
 }
