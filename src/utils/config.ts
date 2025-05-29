@@ -49,6 +49,14 @@ export const DEFAULT_CONFIG: ServerConfig = {
       args: ['-c'],
       validatePath: (dir: string) => dir.match(defaultValidatePathRegex) !== null,
       blockedOperators: ['&', '|', ';', '`']
+    },
+    wsl: {
+      enabled: true,
+      command: 'wsl.exe',
+      args: ['-d', 'Ubuntu', '-e', 'bash', '-c'],
+      validatePath: (dir: string) => dir.match(defaultValidatePathRegex) !== null,
+      blockedOperators: ['&', '|', ';', '`'],
+      wslDistributionName: 'Ubuntu'
     }
   }
 };
@@ -77,6 +85,13 @@ export function loadConfig(configPath?: string): ServerConfig {
     }
   }
 
+  // Validate WSL specific configuration
+  if (config.shells.wsl && config.shells.wsl.enabled) {
+    if (!config.shells.wsl.wslDistributionName || typeof config.shells.wsl.wslDistributionName !== 'string' || config.shells.wsl.wslDistributionName.trim() === '') {
+      throw new Error('Invalid configuration for wsl: wslDistributionName must be a non-empty string when wsl is enabled');
+    }
+  }
+
   // Use defaults only if no config was loaded
   const mergedConfig = Object.keys(loadedConfig).length > 0 
     ? mergeConfigs(DEFAULT_CONFIG, loadedConfig)
@@ -101,7 +116,8 @@ function mergeConfigs(defaultConfig: ServerConfig, userConfig: Partial<ServerCon
       // Same for each shell - if user provided config, use it entirely
       powershell: userConfig.shells?.powershell || defaultConfig.shells.powershell,
       cmd: userConfig.shells?.cmd || defaultConfig.shells.cmd,
-      gitbash: userConfig.shells?.gitbash || defaultConfig.shells.gitbash
+      gitbash: userConfig.shells?.gitbash || defaultConfig.shells.gitbash,
+      wsl: userConfig.shells?.wsl || defaultConfig.shells.wsl
     }
   };
 
@@ -134,6 +150,13 @@ function validateConfig(config: ServerConfig): void {
   // Validate timeout (minimum 1 second)
   if (config.security.commandTimeout < 1) {
     throw new Error('commandTimeout must be at least 1 second');
+  }
+
+  // Validate WSL specific configuration
+  if (config.shells.wsl && config.shells.wsl.enabled) {
+    if (!config.shells.wsl.wslDistributionName || typeof config.shells.wsl.wslDistributionName !== 'string' || config.shells.wsl.wslDistributionName.trim() === '') {
+      throw new Error('Invalid configuration for wsl: wslDistributionName must be a non-empty string when wsl is enabled');
+    }
   }
 }
 

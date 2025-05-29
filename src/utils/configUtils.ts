@@ -23,6 +23,9 @@ export function createSerializableConfig(config: ServerConfig): any {
         args: [...shell.args],
         blockedOperators: shell.blockedOperators ? [...shell.blockedOperators] : []
       };
+      if (shell.wslDistributionName) {
+        acc[key].wslDistributionName = shell.wslDistributionName;
+      }
       return acc;
     }, {} as Record<string, any>)
   };

@@ -14,6 +14,7 @@ export interface ShellConfig {
   args: string[];
   validatePath?: (dir: string) => boolean;
   blockedOperators?: string[]; // Added for shell-specific operator restrictions
+  wslDistributionName?: string;
 }
 
 export interface ServerConfig {
@@ -22,5 +23,6 @@ export interface ServerConfig {
     powershell: ShellConfig;
     cmd: ShellConfig;
     gitbash: ShellConfig;
+    wsl: ShellConfig;
   };
 }
