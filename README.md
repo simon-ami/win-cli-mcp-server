@@ -93,6 +93,15 @@ After configuring, you can:
 - View configured SSH connections and server configuration in the Resources section
 - Manage SSH connections through the provided tools
 
+
+
+## Running evals
+
+The evals package loads an mcp client that then runs the index.ts file, so there is no need to rebuild between tests. You can load environment variables by prefixing the npx command. Full documentation can be found [here](https://www.mcpevals.io/docs).
+
+```bash
+OPENAI_API_KEY=your-key  npx mcp-eval src/evals/evals.ts src/index.ts
+```
 ## Configuration
 
 The server uses a JSON configuration file to customize its behavior. You can specify settings for security controls, shell configurations, and SSH connections.

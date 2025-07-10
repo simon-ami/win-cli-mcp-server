@@ -43,6 +43,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.0.1",
     "@types/ssh2": "^1.15.1",
+    "mcp-evals": "^1.0.18",
     "ssh2": "^1.16.0",
     "yargs": "^17.7.2",
     "zod": "^3.22.4"
