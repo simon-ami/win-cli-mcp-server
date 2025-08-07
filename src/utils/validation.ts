@@ -4,15 +4,6 @@ import { promisify } from 'util';
 import type { ShellConfig } from '../types/config.js';
 const execAsync = promisify(exec);
 
-export async function resolveCommandPath(command: string): Promise<string | null> {
-    try {
-        const { stdout } = await execAsync(`where "${command}"`, { encoding: 'utf8' });
-        return stdout.split('\n')[0].trim();
-    } catch {
-        return null;
-    }
-}
-
 export function extractCommandName(command: string): string {
     // Remove any path components
     const basename = path.basename(command);

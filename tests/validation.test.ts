@@ -1,7 +1,6 @@
 import { describe, expect, test, jest } from '@jest/globals';
 import path from 'path';
 import {
-  resolveCommandPath,
   extractCommandName,
   isCommandBlocked,
   isArgumentBlocked,
@@ -15,14 +14,9 @@ import type { ShellConfig } from '../src/types/config.js';
 
 // Mock child_process exec
 jest.mock('child_process', () => ({
-  exec: jest.fn((cmd: string, callback: (error: Error | null, result: { stdout: string } | null) => void) => {
-    if (cmd === 'where "cmd.exe"') {
-      callback(null, { stdout: 'C:\\Windows\\System32\\cmd.exe\n' });
-    } else if (cmd === 'where "notfound"') {
-      callback(new Error('Command not found'), null);
-    }
-  })
+  exec: jest.fn()
 }));
+
 
 describe('Command Name Extraction', () => {
   test('extractCommandName handles various formats', () => {
