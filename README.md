@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/simonb97-win-cli-mcp-server-badge.png)](https://mseep.ai/app/simonb97-win-cli-mcp-server)
+
 # Windows CLI MCP Server
 
 > [!CAUTION]
